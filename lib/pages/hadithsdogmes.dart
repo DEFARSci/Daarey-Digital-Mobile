@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 
 class Hadithsdogmes extends StatefulWidget {
@@ -6,67 +8,91 @@ class Hadithsdogmes extends StatefulWidget {
   _HadithsdogmesState createState() => _HadithsdogmesState();
 }
 
-class _HadithsdogmesState extends State<Hadithsdogmes> {
-  final AudioPlayer _audioPlayer = AudioPlayer(); // Instance d'AudioPlayer
+class _HadithsdogmesState extends State<Hadithsdogmes> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool isPlaying = false;
-  String? currentAudioPath; // Audio en cours de lecture
+  String? currentAudioPath;
+  List hadiths = [];
+  List dogmes = [];
 
-  // Liste des hadiths/dogmes avec leurs fichiers audio, titres et descriptions
-  final List<Map<String, String>> hadithsdogmes = [
-    {
-      "title": "Hadith 1",
-      "description": "Description du Hadith 1 : L'importance de la prière.",
-      "audio": "audios/abdou.mp3"
-    },
-    {
-      "title": "Dogme 1",
-      "description": "Description du Dogme 1 : Les fondements de la foi.",
-      "audio": "audios/dogme1.mp3"
-    },
-    {
-      "title": "Hadith 2",
-      "description": "Description du Hadith 2 : La bienveillance envers les autres.",
-      "audio": "audios/hadith2.mp3"
-    },
-    {
-      "title": "Dogme 2",
-      "description": "Description du Dogme 1 : Les fondements de la foi.",
-      "audio": "audios/dogme1.mp3"
-    },
-    {
-      "title": "Hadith 3",
-      "description": "Description du Hadith 2 : La bienveillance envers les autres.",
-      "audio": "audios/hadith2.mp3"
-    },
-  ];
+  final String staticAudioUrl = 'https://www.hadith.defarsci.fr/audios/1737634407.mp3';
 
-  // Méthode pour jouer ou arrêter un audio
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchHadiths();
+    _fetchDogmes();
+
+    // Écouter les changements d'état du lecteur audio
+    _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      setState(() {
+        isPlaying = (state == PlayerState.playing);
+      });
+    });
+  }
+
+  // Récupérer les Hadiths
+  Future<void> _fetchHadiths() async {
+    final url = Uri.parse('https://www.hadith.defarsci.fr/api/hadiths');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        setState(() {
+          hadiths = json.decode(response.body);
+        });
+      } else {
+        print("Erreur Hadiths ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Erreur Hadiths : $e");
+    }
+  }
+
+  // Récupérer les Dogmes
+  Future<void> _fetchDogmes() async {
+    final url = Uri.parse('https://www.hadith.defarsci.fr/api/dogmes');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        setState(() {
+          dogmes = json.decode(response.body);
+        });
+      } else {
+        print("Erreur Dogmes ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Erreur Dogmes : $e");
+    }
+  }
+
+  // Jouer ou arrêter l'audio
   Future<void> _toggleAudio(String audioPath) async {
     try {
       if (!isPlaying || currentAudioPath != audioPath) {
-        // Si un autre audio est joué ou aucun n'est actif
-        await _audioPlayer.stop(); // Arrête l'audio en cours
-        await _audioPlayer.setSource(AssetSource(audioPath)); // Charge l'audio
-        await _audioPlayer.resume(); // Démarre la lecture
+        await _audioPlayer.stop();
+        await _audioPlayer.setSourceUrl(audioPath);
+        await _audioPlayer.play(UrlSource(audioPath));
         setState(() {
           isPlaying = true;
           currentAudioPath = audioPath;
         });
       } else {
-        // Pause l'audio actuel
         await _audioPlayer.pause();
         setState(() {
           isPlaying = false;
         });
       }
     } catch (e) {
-      print("Erreur : $e"); // Affiche les erreurs en cas de problème
+      print("Erreur audio : $e");
     }
   }
 
   @override
   void dispose() {
-    _audioPlayer.dispose(); // Libère les ressources audio
+    _audioPlayer.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -75,66 +101,118 @@ class _HadithsdogmesState extends State<Hadithsdogmes> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Hadiths et Dogmes"),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Color(0xFF51B37F), // Couleur de l’indicateur sous l’onglet sélectionné
+          labelColor: Color(0xFF51B37F), // Couleur du texte de l’onglet sélectionné
+          unselectedLabelColor: Colors.black, // Couleur des onglets non sélectionnés
+          tabs: [
+            Tab(text: "Hadiths"),
+            Tab(text: "Dogmes"),
+          ],
+        ),
       ),
-
-      body: ListView.builder(
-        itemCount: hadithsdogmes.length,
-        itemBuilder: (context, index) {
-          final hadithDogme = hadithsdogmes[index];
-          return Card(
-            margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Titre
-                  Text(
-                    hadithDogme["title"] ?? "Titre inconnu",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  // Description
-                  Text(
-                    hadithDogme["description"] ?? "Pas de description disponible.",
-                    style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                  ),
-                  SizedBox(height: 16),
-                  // Player audio avec bouton lecture/pause
-                  Row(
-                    children: [
-                      // Bouton lecture/pause
-                      IconButton(
-                        icon: Icon(
-                          currentAudioPath == hadithDogme["audio"] && isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                        ),
-                        onPressed: () {
-                          if (hadithDogme["audio"] != null) {
-                            _toggleAudio(hadithDogme["audio"]!);
-                          }
-                        },
-                      ),
-                      Text(
-                        currentAudioPath == hadithDogme["audio"] && isPlaying
-                            ? "Lecture en cours..."
-                            : "Appuyez pour écouter",
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ],
+      body: Column(
+        children: [
+          // Lecture de l'audio statique
+          Card(
+            margin: EdgeInsets.all(16),
+            child: ListTile(
+              leading: IconButton(
+                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                onPressed: () => _toggleAudio(staticAudioUrl),
               ),
+              title: Text(
+                "Écouter l'audio principal",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(isPlaying ? "Lecture en cours..." : "Appuyez pour écouter"),
             ),
-          );
-        },
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Liste des Hadiths
+                hadiths.isEmpty
+                    ? Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                  itemCount: hadiths.length,
+                  itemBuilder: (context, index) {
+                    final hadith = hadiths[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hadith["titre"] ?? "Titre inconnu",
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              hadith["contenu"] ?? "Pas de description disponible.",
+                              style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                            ),
+                            SizedBox(height: 16),
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(
+                                    currentAudioPath == hadith["audio"] && isPlaying
+                                        ? Icons.pause
+                                        : Icons.play_arrow,
+                                  ),
+                                  onPressed: () {
+                                    if (hadith["audio"] != null) {
+                                      _toggleAudio(hadith["audio"]!);
+                                    }
+                                  },
+                                ),
+                                Text(
+                                  currentAudioPath == hadith["audio"] && isPlaying
+                                      ? "Lecture en cours..."
+                                      : "Appuyez pour écouter",
+                                  style: TextStyle(fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                // Liste des Dogmes
+                dogmes.isEmpty
+                    ? Center(child: CircularProgressIndicator())
+                    : ListView.builder(
+                  itemCount: dogmes.length,
+                  itemBuilder: (context, index) {
+                    final dogme = dogmes[index];
+                    return Card(
+                      margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      child: ListTile(
+                        title: Text(
+                          dogme["titre"] ?? "Dogme inconnu",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(dogme["description"] ?? "Pas de description"),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
+        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -161,7 +239,7 @@ class _HadithsdogmesState extends State<Hadithsdogmes> {
             label: "Faire un don",
           ),
         ],
-        currentIndex: 2, // Index correspondant à la page actuelle (Hadith et Dogme)
+        currentIndex: 2,
         onTap: (index) {
           switch (index) {
             case 0:
@@ -171,7 +249,7 @@ class _HadithsdogmesState extends State<Hadithsdogmes> {
               Navigator.pushNamed(context, '/cours');
               break;
             case 2:
-              break; // Page actuelle
+              break;
             case 3:
               Navigator.pushNamed(context, '/faq');
               break;

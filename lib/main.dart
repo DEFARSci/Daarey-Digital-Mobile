@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(primarySwatch: Colors.blue),
       initialRoute: '/',
       routes: {
-        '/': (context) => const Accueil(),
+        '/': (context) =>  Accueil(),
         '/cours': (context) => const Cours(),
         '/hadith': (context) =>  Hadithsdogmes(),
         '/faq': (context) => const Faq(),
@@ -39,5 +39,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-

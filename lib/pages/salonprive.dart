@@ -83,6 +83,8 @@ class _SalonpriveState extends State<Salonprive> {
       // Barre de navigation
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
+        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),

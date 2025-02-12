@@ -127,7 +127,8 @@ class _CoursState extends State<Cours> {
             Center(
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green, // Couleur verte pour correspondre à l'image
+                  // backgroundColor: Colors.green, // Couleur verte pour correspondre à l'image
+                  backgroundColor: Color(0xFF51b37f),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
                 onPressed: () {
@@ -135,7 +136,7 @@ class _CoursState extends State<Cours> {
                 },
                 child: const Text(
                   "Accéder aux salles de cours",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
+                  style: TextStyle(fontSize: 16, color: Colors.white, ),
                 ),
               ),
             ),
@@ -144,6 +145,8 @@ class _CoursState extends State<Cours> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
+        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
@@ -233,7 +236,7 @@ class _CoursState extends State<Cours> {
             },
             child: Text(
               button1Text,
-              style: const TextStyle(fontSize: 16, color: Colors.blue),
+              style: const TextStyle(fontSize: 16, color: Color(0xFF51b37f),),
             ),
           ),
           const SizedBox(height: 8),
@@ -244,7 +247,9 @@ class _CoursState extends State<Cours> {
             },
             child: Text(
               button2Text,
-              style: const TextStyle(fontSize: 16, color: Colors.blue),
+              style: const TextStyle(fontSize: 16,
+                  color: Color(0xFF51b37f),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -253,3 +258,6 @@ class _CoursState extends State<Cours> {
     );
   }
 }
+//#51B37F
+//backgroundColor: const Color(0xFF85addb),
+//color: const Color(0xFF85addb),

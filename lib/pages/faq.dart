@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class Faq extends StatefulWidget {
   const Faq({super.key});
@@ -7,22 +9,9 @@ class Faq extends StatefulWidget {
   State<Faq> createState() => _FaqState();
 }
 
-class _FaqState extends State<Faq> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 5, vsync: this); // 5 onglets
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
+class _FaqState extends State<Faq> {
   int _currentThemeIndex = 0;
+
   final List<String> themes = [
     'Coran',
     'Sounah',
@@ -33,21 +22,50 @@ class _FaqState extends State<Faq> with SingleTickerProviderStateMixin {
     '...'
   ];
 
+  List<dynamic> faqData = []; // Liste pour stocker les questions/réponses
+  bool isLoading = true; // Indicateur de chargement
+
+  @override
+  void initState() {
+    super.initState();
+    fetchFAQ();
+  }
+
+  Future<void> fetchFAQ() async {
+    try {
+      final response = await http.get(Uri.parse("https://www.hadith.defarsci.fr/api/faq"));
+      if (response.statusCode == 200) {
+        final decodedResponse = jsonDecode(response.body);
+        if (decodedResponse['success'] == true) {
+          setState(() {
+            faqData = decodedResponse['data']; // On récupère seulement la liste de questions
+            isLoading = false;
+          });
+        } else {
+          setState(() {
+            isLoading = false;
+          });
+          print("Erreur: Réponse API invalide");
+        }
+      } else {
+        setState(() {
+          isLoading = false;
+        });
+        print("Erreur HTTP: ${response.statusCode}");
+      }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      print("Erreur lors du chargement de la FAQ: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("FAQ"),
-        // bottom: TabBar(
-        //   controller: _tabController,
-        //   tabs: const [
-        //     Tab(text: "Accueil"),
-        //     Tab(text: "Cours"),
-        //     Tab(text: "Hadiths et Dogmes"),
-        //     Tab(text: "FAQ"),
-        //     Tab(text: "Salon privé"),
-        //   ],
-        // ),
         actions: [
           IconButton(
             onPressed: () {},
@@ -79,18 +97,14 @@ class _FaqState extends State<Faq> with SingleTickerProviderStateMixin {
                     margin: const EdgeInsets.symmetric(horizontal: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: _currentThemeIndex == index
-                          ? Colors.blue
-                          : Colors.grey[300],
+                      color: _currentThemeIndex == index ? Color(0xFF51B37F) : Colors.grey[300],
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Center(
                       child: Text(
                         themes[index],
                         style: TextStyle(
-                          color: _currentThemeIndex == index
-                              ? Colors.white
-                              : Colors.black,
+                          color: _currentThemeIndex == index ? Colors.white : Colors.black,
                         ),
                       ),
                     ),
@@ -100,90 +114,32 @@ class _FaqState extends State<Faq> with SingleTickerProviderStateMixin {
             ),
           ),
           const Divider(),
-          // Premier Expanded
-          Expanded(
-            child: PageView.builder(
-              itemCount: 5, // Nombre de questions (exemple)
+
+          // Contenu de la FAQ
+          isLoading
+              ? const Center(child: CircularProgressIndicator()) // Indicateur de chargement
+              : Expanded(
+            child: ListView.builder(
+              itemCount: faqData.length,
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Aligner à gauche
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Texte de la question/réponse
+                      // Question
                       Text(
-                        "Lorem Ipsum is simply dummy text of the printing "
-                            "and typesetting industry. Lorem Ipsum has been the "
-                            "industry's standard dummy text ever since the 1500s, "
-                            "when an unknown printer took a galley...",
+                        faqData[index]['question'] ?? "Question inconnue",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      // Réponse
+                      Text(
+                        faqData[index]['answer'] ?? "Réponse non disponible",
                         textAlign: TextAlign.justify,
                         style: const TextStyle(fontSize: 16),
                       ),
-                      const SizedBox(height: 16), // Espacement entre texte et boutons
-                      // Boutons (Reculer, Lire, Avancer)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.fast_rewind),
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.play_arrow),
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.fast_forward),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          // Espacement réduit entre les deux Expanded
-          const SizedBox(height: 8), // Hauteur ajustée ici
-          // Deuxième Expanded
-          Expanded(
-            child: PageView.builder(
-              itemCount: 5, // Nombre de questions (exemple)
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Aligner à gauche
-                    children: [
-                      // Texte de la question/réponse
-                      Text(
-                        "Lorem Ipsum is simply dummy text of the printing "
-                            "and typesetting industry. Lorem Ipsum has been the "
-                            "industry's standard dummy text ever since the 1500s, "
-                            "when an unknown printer took a galley...",
-                        textAlign: TextAlign.justify,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(height: 16), // Espacement entre texte et boutons
-                      // Boutons (Reculer, Lire, Avancer)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.fast_rewind),
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.play_arrow),
-                          ),
-                          IconButton(
-                            onPressed: () {},
-                            icon: const Icon(Icons.fast_forward),
-                          ),
-                        ],
-                      ),
+                      const Divider(),
                     ],
                   ),
                 );
@@ -192,33 +148,18 @@ class _FaqState extends State<Faq> with SingleTickerProviderStateMixin {
           ),
         ],
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
+        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Accueil",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: "Cours",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_books),
-            label: "Hadith et Dogme",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.help),
-            label: "FAQ",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.lock),
-            label: "Salon privé",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: "Faire un don",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
+          BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
+          BottomNavigationBarItem(icon: Icon(Icons.library_books), label: "Hadith et Dogme"),
+          BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
+          BottomNavigationBarItem(icon: Icon(Icons.lock), label: "Salon privé"),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
         ],
         currentIndex: 3,
         onTap: (index) {

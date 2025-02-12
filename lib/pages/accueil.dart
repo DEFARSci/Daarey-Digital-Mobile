@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class Accueil extends StatefulWidget {
   const Accueil({super.key});
@@ -12,15 +14,20 @@ class Accueil extends StatefulWidget {
 class _AccueilState extends State<Accueil> {
   late VideoPlayerController _videoController;
   late Future<void> _initializeVideoPlayerFuture;
+  late Future<List<dynamic>> _actualites;
+  late Future<List<dynamic>> _events;
 
   @override
   void initState() {
     super.initState();
     _videoController = VideoPlayerController.asset(
-      'assets/videos/fatiha.mp4', // Chemin de la vidéo locale
+      'assets/videos/fatiha.mp4',
     );
     _initializeVideoPlayerFuture = _videoController.initialize();
     _videoController.setLooping(true);
+
+    _actualites = _fetchActualites();
+    _events = _fetchEvents();
   }
 
   @override
@@ -28,6 +35,46 @@ class _AccueilState extends State<Accueil> {
     _videoController.dispose();
     super.dispose();
   }
+
+  // Fonction pour récupérer les actualités
+  Future<List<dynamic>> _fetchActualites() async {
+    final url = Uri.parse('https://www.hadith.defarsci.fr/api/actualites');
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data is List ? data : [];
+      }
+    } catch (e) {
+      print("Erreur lors de la récupération des actualités : $e");
+    }
+
+    return [];
+  }
+
+  // Fonction pour récupérer les événements
+  Future<List<dynamic>> _fetchEvents() async {
+    final url = Uri.parse('https://www.hadith.defarsci.fr/api/events');
+
+    try {
+      final response = await http.get(url);
+      print("Réponse API événements : ${response.body}"); //  Affiche la réponse brute
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print("Données après décodage : $data"); //  Vérifie le format des données
+        return data is List ? data : [];
+      } else {
+        print("Erreur API événements : ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Erreur lors de la récupération des événements : $e");
+    }
+
+    return [];
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +87,7 @@ class _AccueilState extends State<Accueil> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section Vidéo avec contrôles
+            // 🎥 Section Vidéo avec contrôles
             Container(
               height: 200,
               width: double.infinity,
@@ -82,53 +129,99 @@ class _AccueilState extends State<Accueil> {
               ),
             ),
 
-            // Section Titre et Description
+            // 📰 Section Nos Actualités
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Nos actualités",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
-                        "Praesent vitae eros eget tellus tristique bibendum.",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
+              child: Text(
+                "Nos actualités",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
             ),
 
-            // Section Événements
+            FutureBuilder<List<dynamic>>(
+              future: _actualites,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text("Aucune actualité disponible pour le moment"),
+                  );
+                }
+
+                return Column(
+                  children: snapshot.data!.map((actualite) {
+                    return ListTile(
+                      leading: actualite['image'] != null
+                          ? Image.network(
+                        actualite['image'],
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      )
+                          : const Icon(Icons.article, size: 40),
+                      title: Text(
+                        actualite['titre'] ?? "Titre inconnu",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle:
+                      Text(actualite['description'] ?? "Sans description"),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            // 📅 Section Événements à venir
             const Padding(
               padding: EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Ne ratez pas nos prochains événements",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "Concours de récital de Coran à Pikine. "
-                        "Les inscriptions sont ouvertes sur le lien.",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                ],
+              child: Text(
+                "Événements à venir",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
             ),
 
-            // Carrousel d'images
+            FutureBuilder<List<dynamic>>(
+              future: _events,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(
+                    child: Text("Aucun événement à venir"),
+                  );
+                }
+
+                return Column(
+                  children: snapshot.data!.map((event) {
+                    return ListTile(
+                      leading: event['image_url'] != null
+                          ? Image.network(
+                        "https://www.hadith.defarsci.fr/images/${event['image_url']}",
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                      )
+                          : const Icon(Icons.event, size: 40),
+                      title: Text(
+                        event['title'] ?? "Titre inconnu",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text(
+                        event['content'] ?? "Sans description",
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () {
+                        // Ajouter une action lorsqu'on clique sur un événement
+                      },
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            // 🖼️ Carrousel d'images
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: CarouselSlider(
@@ -165,9 +258,11 @@ class _AccueilState extends State<Accueil> {
         ),
       ),
 
-      // Barre de Navigation
+      // 🔍 Barre de Navigation
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
+        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
