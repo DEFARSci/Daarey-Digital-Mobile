@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class InscriptionCoran extends StatefulWidget {
   const InscriptionCoran({super.key});
@@ -8,20 +10,99 @@ class InscriptionCoran extends StatefulWidget {
 }
 
 class _InscriptionCoranState extends State<InscriptionCoran> {
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
-  final TextEditingController _dateNaissanceController =
-  TextEditingController();
+  final TextEditingController _dateNaissanceController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
-  String? _selectedDate;
-  String? _selectedGenre = "Male";
+  final TextEditingController _dateCoursController = TextEditingController();
+  String? _selectedGenre = "Masculin";
   List<String> selectedHours = [];
+
+  Future<void> _submitForm() async {
+    // Vérification que tous les champs sont remplis
+    if (_nameController.text.isEmpty ||
+        _prenomController.text.isEmpty ||
+        _dateNaissanceController.text.isEmpty ||
+        _telephoneController.text.isEmpty ||
+        _dateCoursController.text.isEmpty ||
+        selectedHours.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Veuillez remplir tous les champs")),
+      );
+      return;
+    }
+
+    // URL de l'API
+    var url = Uri.parse("https://www.hadith.defarsci.fr/api/coran-inscriptions/débutant");
+
+    // Données à envoyer
+    Map<String, dynamic> data = {
+      "first_name": _prenomController.text,
+      "last_name": _nameController.text,
+      "date_naissance": _dateNaissanceController.text,
+      "genre": _selectedGenre,
+      "phone": _telephoneController.text,
+      "date_cours": _dateCoursController.text,
+      "heure_cours": selectedHours.join(", "),
+    };
+
+    // Log des données envoyées
+    print("Données envoyées: ${jsonEncode(data)}");
+
+    try {
+      // Envoi de la requête POST
+      var response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: jsonEncode(data), // Encode les données en JSON
+      );
+
+      // Log de la réponse
+      print("Statut HTTP: ${response.statusCode}");
+      print("Réponse du serveur: ${response.body}");
+
+      var responseData = jsonDecode(response.body);
+
+      // Gestion de la réponse
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (responseData["success"] == true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Inscription réussie !")),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Erreur: ${responseData["message"]}")),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur: ${response.body}")),
+        );
+      }
+    } catch (e) {
+      // Gestion des erreurs de connexion
+      print("Erreur de connexion: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Échec de connexion: $e")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text("Inscription Cours Coran"),
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
+        centerTitle: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -29,57 +110,54 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Genre
+              // Sélection du genre
               Row(
                 children: [
-                  const Text("Genre: "),
+                  const Text("Genre: ", style: TextStyle(color: marron)),
                   Radio<String>(
-                    value: "Male",
+                    value: "Masculin",
                     groupValue: _selectedGenre,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGenre = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _selectedGenre = value),
+                    activeColor: marron,
                   ),
-                  const Text("Male"),
+                  const Text("Masculin", style: TextStyle(color: marron)),
                   Radio<String>(
-                    value: "Female",
+                    value: "Féminin",
                     groupValue: _selectedGenre,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGenre = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _selectedGenre = value),
+                    activeColor: marron,
                   ),
-                  const Text("Female"),
+                  const Text("Féminin", style: TextStyle(color: marron)),
                 ],
               ),
               const SizedBox(height: 10),
 
-              // Nom
+              // Champ Nom
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: "Nom",
                   border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Prénom
+              // Champ Prénom
               TextField(
                 controller: _prenomController,
                 decoration: const InputDecoration(
                   labelText: "Prénom",
                   border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Date de naissance
+              // Champ Date de naissance
               TextField(
                 controller: _dateNaissanceController,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: "Date de naissance",
                   border: const OutlineInputBorder(),
@@ -95,53 +173,60 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
                       if (selectedDate != null) {
                         setState(() {
                           _dateNaissanceController.text =
-                          "${selectedDate.day}/${selectedDate.month}/${selectedDate.year}";
+                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
                         });
                       }
                     },
                   ),
+                  labelStyle: TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Numéro de téléphone
+              // Champ Téléphone
               TextField(
                 controller: _telephoneController,
                 decoration: const InputDecoration(
                   labelText: "N° de téléphone",
                   border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Sélectionnez une date
-              const Text(
-                "Sélectionnez une date :",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              DropdownButton<String>(
-                value: _selectedDate,
-                isExpanded: true,
-                items: List.generate(31, (index) {
-                  return DropdownMenuItem<String>(
-                    value: (index + 1).toString(),
-                    child: Text("Jour ${(index + 1)}"),
-                  );
-                }),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDate = value;
-                  });
-                },
-                hint: const Text("Sélectionnez une date"),
+              // Champ Date du cours
+              TextField(
+                controller: _dateCoursController,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: "Date du cours",
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.calendar_today),
+                    onPressed: () async {
+                      DateTime? selectedDate = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(2100),
+                      );
+                      if (selectedDate != null) {
+                        setState(() {
+                          _dateCoursController.text =
+                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
+                        });
+                      }
+                    },
+                  ),
+                  labelStyle: TextStyle(color: marron),
+                ),
               ),
               const SizedBox(height: 20),
 
-              // Plages horaires
+              // Sélection des horaires
               const Text(
                 "Sélectionnez les horaires :",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
               ),
               Wrap(
                 children: [
@@ -158,16 +243,11 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
               ),
               const SizedBox(height: 20),
 
-              // Bouton de réservation
+              // Bouton de soumission
               Center(
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Logique pour soumettre les données
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 15),
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: beigeClair, foregroundColor: marron),
+                  onPressed: _submitForm, // Appel de la méthode _submitForm
                   child: const Text("Réserver"),
                 ),
               ),
@@ -178,6 +258,7 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
     );
   }
 
+  // Widget pour les cases à cocher
   Widget buildCheckbox(String time) {
     return Padding(
       padding: const EdgeInsets.all(4.0),
@@ -186,6 +267,7 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
         children: [
           Checkbox(
             value: selectedHours.contains(time),
+            activeColor: marron,
             onChanged: (bool? selected) {
               setState(() {
                 if (selected == true) {
@@ -196,7 +278,7 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
               });
             },
           ),
-          Text(time),
+          Text(time, style: TextStyle(color: marron)),
         ],
       ),
     );

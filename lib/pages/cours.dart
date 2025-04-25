@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Cours extends StatefulWidget {
   const Cours({super.key});
@@ -8,39 +9,139 @@ class Cours extends StatefulWidget {
   State<Cours> createState() => _CoursState();
 }
 
-class _CoursState extends State<Cours> {
+class _CoursState extends State<Cours> with WidgetsBindingObserver {
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   late VideoPlayerController _videoController;
   late Future<void> _initializeVideoPlayerFuture;
+  bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    _videoController = VideoPlayerController.asset(
-      'assets/videos/fatiha.mp4', // Chemin de la vidéo locale
-    );
-    _initializeVideoPlayerFuture = _videoController.initialize();
-    _videoController.setLooping(true);
+    WidgetsBinding.instance.addObserver(this);
+    _videoController = VideoPlayerController.asset('assets/videos/fatiha.mp4');
+    _initializeVideoPlayerFuture = _videoController.initialize().then((_) {
+      _videoController.setLooping(true);
+    });
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLoggedIn = prefs.getString('auth_token') != null;
+    });
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    if (mounted) {
+      setState(() => _isLoggedIn = false);
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _videoController.dispose();
     super.dispose();
+  }
+
+  Widget _buildCourseSection({
+    required BuildContext context,
+    required String imagePath,
+    required String title,
+    required String button1Text,
+    required String button2Text,
+    required String route1,
+    required String route2,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Image.asset(
+            imagePath,
+            height: 150,
+            width: double.infinity,
+            fit: BoxFit.cover,
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: beigeClair,
+              foregroundColor: marron,
+              minimumSize: const Size(double.infinity, 40),
+            ),
+            onPressed: () => Navigator.pushNamed(context, route1),
+            child: Text(button1Text),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: beigeClair,
+              foregroundColor: marron,
+              minimumSize: const Size(double.infinity, 40),
+            ),
+            onPressed: () => Navigator.pushNamed(context, route2),
+            child: Text(button2Text),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _navigateToPrivateSection(BuildContext context, String route) async {
+    if (_isLoggedIn) {
+      Navigator.pushNamed(context, route);
+    } else {
+      final result = await Navigator.pushNamed(context, '/login');
+      if (result == true && mounted) {
+        await _checkLoginStatus();
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text("Cours"),
         centerTitle: true,
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
+        actions: [
+          if (_isLoggedIn)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section Vidéo
-            Container(
+            // Vidéo
+            SizedBox(
               height: 200,
               width: double.infinity,
               child: FutureBuilder(
@@ -72,15 +173,15 @@ class _CoursState extends State<Cours> {
                         ),
                       ],
                     );
-                  } else {
-                    return const Center(child: CircularProgressIndicator());
                   }
+                  return Center(child: CircularProgressIndicator(color: marron));
                 },
               ),
             ),
-            // Section Titre et Description
-            const Padding(
-              padding: EdgeInsets.all(16.0),
+
+            // Titre + description
+            Padding(
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -89,55 +190,64 @@ class _CoursState extends State<Cours> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
+                      color: marron,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     "Une vidéo présentative des différents types de cours proposés et comment y assister.",
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                    style: TextStyle(fontSize: 16, color: marron.withOpacity(0.7)),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
 
-            // Section 1 : Image et Actions
+            // Sections cours
             _buildCourseSection(
               context: context,
               imagePath: 'assets/images/coran.jpg',
               title: "Cours Coran",
               button1Text: "S'inscrire cours Débutant",
               button2Text: "S'inscrire cours Confirmé",
+              route1: '/InscriptionCoran',
+              route2: '/Inscriptioncoranconfirme',
             ),
 
-            const SizedBox(height: 16),
-
-            // Section 2 : Deuxième Image et Actions
             _buildCourseSection(
               context: context,
               imagePath: 'assets/images/coran.jpg',
               title: "Cours Fiqh",
               button1Text: "S'inscrire cours Débutant",
               button2Text: "S'inscrire cours Confirmé",
+              route1: '/Inscriptionfikh',
+              route2: '/Inscriptionfikhconfirme',
             ),
 
-            const SizedBox(height: 40), // Espacement avant le bouton d'accès
-
-            // Nouveau bouton ajouté en bas de la page
-            Center(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  // backgroundColor: Colors.green, // Couleur verte pour correspondre à l'image
-                  backgroundColor: Color(0xFF51b37f),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                ),
-                onPressed: () {
-                  Navigator.pushNamed(context, '/salleCours');
-                },
-                child: const Text(
-                  "Accéder aux salles de cours",
-                  style: TextStyle(fontSize: 16, color: Colors.white, ),
-                ),
+            // Boutons d'accès
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: beigeClair,
+                      foregroundColor: marron,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: () => _navigateToPrivateSection(context, '/salleCours'),
+                    child: const Text("Accéder aux salles de cours", style: TextStyle(fontSize: 16)),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: beigeClair,
+                      foregroundColor: marron,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    onPressed: () => _navigateToPrivateSection(context, '/mosquee'),
+                    child: const Text("Accéder à la mosquée AS SALAM", style: TextStyle(fontSize: 16)),
+                  ),
+                ],
               ),
             ),
           ],
@@ -145,119 +255,43 @@ class _CoursState extends State<Cours> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
-        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Accueil",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book),
-            label: "Cours",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.library_books),
-            label: "Hadith et Dogme",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.help),
-            label: "FAQ",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.lock),
-            label: "Salon privé",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: "Faire un don",
-          ),
-        ],
+        backgroundColor: beigeClair,
+        selectedItemColor: marron,
+        unselectedItemColor: marron.withOpacity(0.6),
         currentIndex: 1,
-        onTap: (index) {
+        onTap: (index) async {
           switch (index) {
             case 0:
               Navigator.pushNamed(context, '/');
               break;
             case 1:
-              break; // Page actuelle
+              break;
             case 2:
-              Navigator.pushNamed(context, '/hadith');
+              Navigator.pushNamed(context, '/contributions');
               break;
             case 3:
               Navigator.pushNamed(context, '/faq');
               break;
             case 4:
-              Navigator.pushNamed(context, '/salon');
+              await _navigateToPrivateSection(context, '/salon');
               break;
             case 5:
               Navigator.pushNamed(context, '/don');
               break;
           }
         },
-      ),
-    );
-  }
-
-  // Fonction pour créer une section réutilisable
-  Widget _buildCourseSection({
-    required BuildContext context,
-    required String imagePath,
-    required String title,
-    required String button1Text,
-    required String button2Text,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Image.asset(
-            imagePath,
-            height: 150,
-            width: double.infinity,
-            fit: BoxFit.cover,
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
+          const BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
+          const BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contribution"),
+          const BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
+          BottomNavigationBarItem(
+            icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock),
+            label: "Salon privé",
           ),
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () {
-              // Redirection vers la page InscriptionCoran pour le bouton 1
-              Navigator.pushNamed(context, '/InscriptionCoran');
-            },
-            child: Text(
-              button1Text,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF51b37f),),
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () {
-              // Redirection vers la page InscriptionCoran pour le bouton 2
-              Navigator.pushNamed(context, '/InscriptionCoran');
-            },
-            child: Text(
-              button2Text,
-              style: const TextStyle(fontSize: 16,
-                  color: Color(0xFF51b37f),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+          const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
         ],
       ),
     );
   }
 }
-//#51B37F
-//backgroundColor: const Color(0xFF85addb),
-//color: const Color(0xFF85addb),

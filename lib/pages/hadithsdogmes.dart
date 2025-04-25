@@ -223,8 +223,8 @@ class _HadithsdogmesState extends State<Hadithsdogmes> with SingleTickerProvider
             label: "Cours",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.library_books),
-            label: "Hadith et Dogme",
+            icon: Icon(Icons.volunteer_activism),
+            label: "Contribution",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.help),

@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class Inscriptionfikh extends StatefulWidget {
-  const Inscriptionfikh({super.key});
+class Inscriptionfikhconfirme extends StatefulWidget {
+  const Inscriptionfikhconfirme({super.key});
 
   @override
-  State<Inscriptionfikh> createState() => _InscriptionfikhState();
+  State<Inscriptionfikhconfirme> createState() => _InscriptionfikhconfirmeState();
 }
 
-class _InscriptionfikhState extends State<Inscriptionfikh> {
+class _InscriptionfikhconfirmeState extends State<Inscriptionfikhconfirme> {
   static const Color beigeClair = Color(0xFFF3EEE1);
   static const Color beigeMoyen = Color(0xFFE1DED5);
   static const Color marron = Color(0xFF5D4C3B);
@@ -37,17 +37,17 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
     }
 
     // URL de l'API
-    var url = Uri.parse("https://www.hadith.defarsci.fr/api/fiqh-inscription/débutant");
+    var url = Uri.parse("https://www.hadith.defarsci.fr/api/fiqh-inscription/confirmé");
 
     // Données à envoyer
     Map<String, dynamic> data = {
       "first_name": _prenomController.text,
       "last_name": _nameController.text,
       "date_naissance": _dateNaissanceController.text,
-      "genre": _selectedGenre,
+      "genre": _selectedGenre == "Male" ? "Masculin" : "Féminin", // Convertir en français
       "phone": _telephoneController.text,
       "date_cours": _dateCoursController.text,
-      "heure_cours": selectedHours.join(", "), // Convertit la liste en chaîne
+      "heure_cours": selectedHours.join(", "), // Convertir la liste en chaîne
     };
 
     // Log des données envoyées
@@ -99,7 +99,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
     return Scaffold(
       backgroundColor: beigeMoyen,
       appBar: AppBar(
-        title: const Text("Inscription Cours Fikh Débutant"),
+        title: const Text("Inscription Cours Fikh Confirmé"),
         backgroundColor: beigeClair,
         foregroundColor: marron,
         centerTitle: true,
@@ -117,7 +117,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
                   Radio<String>(
                     value: "Male",
                     groupValue: _selectedGenre,
-                    onChanged: (value)  {
+                    onChanged: (value) {
                       setState(() {
                         _selectedGenre = value;
                       });
@@ -256,8 +256,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
                   onPressed: _submitForm, // Appel de la méthode _submitForm
                   // style: ElevatedButton.styleFrom(
                   //   padding: const EdgeInsets.symmetric(
-                  //       horizontal: 40, vertical: 15,
-                  //       backgroundColor: beigeClair, foregroundColor: marron),
+                  //       horizontal: 40, vertical: 15),
                   // ),
                   child: const Text("Réserver"),
                 ),

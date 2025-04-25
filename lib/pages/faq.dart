@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Faq extends StatefulWidget {
   const Faq({super.key});
@@ -10,159 +11,180 @@ class Faq extends StatefulWidget {
 }
 
 class _FaqState extends State<Faq> {
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   int _currentThemeIndex = 0;
+  List<dynamic> faqData = [];
+  bool isLoading = true;
+  bool _isLoggedIn = false;
 
   final List<String> themes = [
-    'Coran',
-    'Sounah',
-    'Prières',
-    'l\'Islam',
-    'le couple',
-    'le travail',
-    '...'
+    'Coran', 'Sounah', 'Prières', 'l\'Islam', 'le couple', 'le travail', '...'
   ];
-
-  List<dynamic> faqData = []; // Liste pour stocker les questions/réponses
-  bool isLoading = true; // Indicateur de chargement
 
   @override
   void initState() {
     super.initState();
-    fetchFAQ();
+    _checkLoginStatus();
+    _fetchFAQ();
   }
 
-  Future<void> fetchFAQ() async {
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLoggedIn = prefs.getString('auth_token') != null;
+    });
+  }
+
+  Future<void> _fetchFAQ() async {
     try {
-      final response = await http.get(Uri.parse("https://www.hadith.defarsci.fr/api/faq"));
+      final response = await http.get(Uri.parse("https://www.hadith.defarsci.fr/api/faq")).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
-        if (decodedResponse['success'] == true) {
+        if (mounted) {
           setState(() {
-            faqData = decodedResponse['data']; // On récupère seulement la liste de questions
+            faqData = decodedResponse['data'] ?? decodedResponse['faq'] ?? decodedResponse['questions'] ?? decodedResponse;
             isLoading = false;
           });
-        } else {
-          setState(() {
-            isLoading = false;
-          });
-          print("Erreur: Réponse API invalide");
         }
       } else {
-        setState(() {
-          isLoading = false;
-        });
-        print("Erreur HTTP: ${response.statusCode}");
+        if (mounted) {
+          setState(() => isLoading = false);
+        }
+        _showErrorSnackbar("Erreur de chargement: \${response.statusCode}");
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-      });
-      print("Erreur lors du chargement de la FAQ: $e");
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+      _showErrorSnackbar("Erreur de connexion");
+      debugPrint("Erreur FAQ: \$e");
     }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    if (mounted) {
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    }
+  }
+
+  Future<void> _navigateToPrivateSection(BuildContext context) async {
+    if (_isLoggedIn) {
+      Navigator.pushNamed(context, '/salon');
+    } else {
+      final result = await Navigator.pushNamed(context, '/login');
+      if (result == true && mounted) {
+        await _checkLoginStatus();
+      }
+    }
+  }
+
+  Widget _buildThemeChips() {
+    return SizedBox(
+      height: 50,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: themes.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Text(themes[index]),
+              selected: _currentThemeIndex == index,
+              selectedColor: marron,
+              labelStyle: TextStyle(
+                color: _currentThemeIndex == index ? beigeClair : marron,
+              ),
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() => _currentThemeIndex = index);
+                }
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFAQContent() {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (faqData.isEmpty) {
+      return const Center(child: Text("Aucune question disponible pour le moment"));
+    }
+    return ListView.builder(
+      itemCount: faqData.length,
+      itemBuilder: (context, index) {
+        final item = faqData[index];
+        final question = item['question'] ?? item['titre'] ?? item['text'] ?? "Question sans titre";
+        final answer = item['answer'] ?? item['reponse'] ?? item['content'] ?? "Réponse non disponible";
+        return ExpansionTile(
+          title: Text(
+            question,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
+          ),
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                answer,
+                textAlign: TextAlign.justify,
+                style: TextStyle(fontSize: 14, color: marron.withOpacity(0.8)),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text("FAQ"),
+        centerTitle: true,
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
         actions: [
           IconButton(
-            onPressed: () {},
             icon: const Icon(Icons.search),
-          ),
-          IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.mic),
           ),
+          if (_isLoggedIn)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
         ],
       ),
-
       body: Column(
         children: [
-          // Themes
-          SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: themes.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _currentThemeIndex = index;
-                    });
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: _currentThemeIndex == index ? Color(0xFF51B37F) : Colors.grey[300],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Center(
-                      child: Text(
-                        themes[index],
-                        style: TextStyle(
-                          color: _currentThemeIndex == index ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const Divider(),
-
-          // Contenu de la FAQ
-          isLoading
-              ? const Center(child: CircularProgressIndicator()) // Indicateur de chargement
-              : Expanded(
-            child: ListView.builder(
-              itemCount: faqData.length,
-              itemBuilder: (context, index) {
-                return Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Question
-                      Text(
-                        faqData[index]['question'] ?? "Question inconnue",
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      // Réponse
-                      Text(
-                        faqData[index]['answer'] ?? "Réponse non disponible",
-                        textAlign: TextAlign.justify,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const Divider(),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+          _buildThemeChips(),
+          const Divider(height: 1),
+          Expanded(child: _buildFAQContent()),
         ],
       ),
-
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Color(0xFF51B37F), // Couleur de l'élément sélectionné
-        unselectedItemColor: Colors.grey, // Couleur des éléments non sélectionnés
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
-          BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
-          BottomNavigationBarItem(icon: Icon(Icons.library_books), label: "Hadith et Dogme"),
-          BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
-          BottomNavigationBarItem(icon: Icon(Icons.lock), label: "Salon privé"),
-          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
-        ],
+        backgroundColor: beigeClair,
+        selectedItemColor: marron,
+        unselectedItemColor: marron.withOpacity(0.6),
         currentIndex: 3,
-        onTap: (index) {
+        onTap: (index) async {
           switch (index) {
             case 0:
               Navigator.pushNamed(context, '/');
@@ -171,18 +193,26 @@ class _FaqState extends State<Faq> {
               Navigator.pushNamed(context, '/cours');
               break;
             case 2:
-              Navigator.pushNamed(context, '/hadith');
+              Navigator.pushNamed(context, '/contributions');
               break;
             case 3:
-              break; // Page actuelle
+              break;
             case 4:
-              Navigator.pushNamed(context, '/salon');
+              await _navigateToPrivateSection(context);
               break;
             case 5:
               Navigator.pushNamed(context, '/don');
               break;
           }
         },
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
+          const BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
+          const BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contribution"),
+          const BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
+          BottomNavigationBarItem(icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock), label: "Salon privé"),
+          const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
+        ],
       ),
     );
   }

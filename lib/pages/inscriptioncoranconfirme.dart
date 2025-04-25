@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class Inscriptionfikh extends StatefulWidget {
-  const Inscriptionfikh({super.key});
+class Inscriptioncoranconfirme extends StatefulWidget {
+  const Inscriptioncoranconfirme({super.key});
 
   @override
-  State<Inscriptionfikh> createState() => _InscriptionfikhState();
+  State<Inscriptioncoranconfirme> createState() => _InscriptioncoranconfirmeState();
 }
 
-class _InscriptionfikhState extends State<Inscriptionfikh> {
+class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
   static const Color beigeClair = Color(0xFFF3EEE1);
   static const Color beigeMoyen = Color(0xFFE1DED5);
   static const Color marron = Color(0xFF5D4C3B);
@@ -19,7 +19,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
   final TextEditingController _dateNaissanceController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
   final TextEditingController _dateCoursController = TextEditingController();
-  String? _selectedGenre = "Male";
+  String? _selectedGenre = "Masculin";
   List<String> selectedHours = [];
 
   Future<void> _submitForm() async {
@@ -36,8 +36,8 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
       return;
     }
 
-    // URL de l'API
-    var url = Uri.parse("https://www.hadith.defarsci.fr/api/fiqh-inscription/débutant");
+    // URL de l'API (encodée pour éviter les problèmes de caractères spéciaux)
+    var url = Uri.parse("https://www.hadith.defarsci.fr/api/coran-inscriptions/confirmé");
 
     // Données à envoyer
     Map<String, dynamic> data = {
@@ -47,10 +47,11 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
       "genre": _selectedGenre,
       "phone": _telephoneController.text,
       "date_cours": _dateCoursController.text,
-      "heure_cours": selectedHours.join(", "), // Convertit la liste en chaîne
+      "heure_cours": selectedHours.isNotEmpty ? selectedHours.first : "", // Envoyer une seule heure
     };
 
     // Log des données envoyées
+    print("URL: $url");
     print("Données envoyées: ${jsonEncode(data)}");
 
     try {
@@ -99,7 +100,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
     return Scaffold(
       backgroundColor: beigeMoyen,
       appBar: AppBar(
-        title: const Text("Inscription Cours Fikh Débutant"),
+        title: const Text("Inscription Cours Coran Confirmé"),
         backgroundColor: beigeClair,
         foregroundColor: marron,
         centerTitle: true,
@@ -110,37 +111,29 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Genre
+              // Sélection du genre
               Row(
                 children: [
                   const Text("Genre: ", style: TextStyle(color: marron)),
                   Radio<String>(
-                    value: "Male",
+                    value: "Masculin",
                     groupValue: _selectedGenre,
-                    onChanged: (value)  {
-                      setState(() {
-                        _selectedGenre = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _selectedGenre = value),
                     activeColor: marron,
                   ),
-                  const Text("Male", style: TextStyle(color: marron)),
+                  const Text("Masculin", style: TextStyle(color: marron)),
                   Radio<String>(
-                    value: "Female",
+                    value: "Féminin",
                     groupValue: _selectedGenre,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedGenre = value;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _selectedGenre = value),
                     activeColor: marron,
                   ),
-                  const Text("Female", style: TextStyle(color: marron)),
+                  const Text("Féminin", style: TextStyle(color: marron)),
                 ],
               ),
               const SizedBox(height: 10),
 
-              // Nom
+              // Champ Nom
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -151,7 +144,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Prénom
+              // Champ Prénom
               TextField(
                 controller: _prenomController,
                 decoration: const InputDecoration(
@@ -162,9 +155,10 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Date de naissance
+              // Champ Date de naissance
               TextField(
                 controller: _dateNaissanceController,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: "Date de naissance",
                   border: const OutlineInputBorder(),
@@ -190,7 +184,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Numéro de téléphone
+              // Champ Téléphone
               TextField(
                 controller: _telephoneController,
                 decoration: const InputDecoration(
@@ -201,9 +195,10 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 20),
 
-              // Date du cours
+              // Champ Date du cours
               TextField(
                 controller: _dateCoursController,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: "Date du cours",
                   border: const OutlineInputBorder(),
@@ -229,7 +224,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 20),
 
-              // Plages horaires
+              // Sélection des horaires
               const Text(
                 "Sélectionnez les horaires :",
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
@@ -249,16 +244,11 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 20),
 
-              // Bouton de réservation
+              // Bouton de soumission
               Center(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: beigeClair, foregroundColor: marron),
                   onPressed: _submitForm, // Appel de la méthode _submitForm
-                  // style: ElevatedButton.styleFrom(
-                  //   padding: const EdgeInsets.symmetric(
-                  //       horizontal: 40, vertical: 15,
-                  //       backgroundColor: beigeClair, foregroundColor: marron),
-                  // ),
                   child: const Text("Réserver"),
                 ),
               ),
@@ -269,6 +259,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
     );
   }
 
+  // Widget pour les cases à cocher
   Widget buildCheckbox(String time) {
     return Padding(
       padding: const EdgeInsets.all(4.0),
