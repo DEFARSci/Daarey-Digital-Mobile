@@ -2,6 +2,8 @@
 class Assets {
   Assets._();
 
+  static const String assetsKh1318ARRFRR = 'assets/kh1318_AR_R_FR_R.pdf';
+  static const String audiosAbdou = 'assets/audios/abdou.mp3';
   static const String imagesCoran = 'assets/images/coran.jpg';
   static const String imagesPhoto = 'assets/images/photo.jpg';
   static const String imagesPhoto1 = 'assets/images/photo1.jpg';

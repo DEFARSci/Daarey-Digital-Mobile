@@ -53,7 +53,7 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const Register(),
         '/login': (context) => const Login(),
         '/formulaireinscription': (context) => const FormulaireInscription(),
-        '/khotba': (context) => const Khotba(),
+        '/khotba': (context) =>  Khotba(),
         '/projet_madrassa': (context) => const ProjetMadrassa(),
         '/biographie': (context) => const DaarayDigitalApp(),
       },

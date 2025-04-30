@@ -12,6 +12,10 @@ class MosqueeAssalam extends StatefulWidget {
 }
 
 class _MosqueeAssalamState extends State<MosqueeAssalam> {
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   final LatLng mosqueLocation = const LatLng(48.8566, 2.3522); // Paris, France
   int _currentIndex = 1; // Index pour la page Mosquée (ajustez selon votre besoin)
 
@@ -52,9 +56,12 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text("Mosquée As Salam"),
         centerTitle: true,
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -62,15 +69,19 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Description de la mosquée
-            const Text(
+            Text(
               "Description de la mosquée",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               "La mosquée As Salam est un lieu de culte et d'apprentissage situé au cœur de la ville. "
                   "Elle propose des cours pour les enfants de 6 à 14 ans, ainsi que des activités communautaires.",
-              style: TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16, color: marron.withOpacity(0.7)),
             ),
             const SizedBox(height: 20),
 
@@ -79,12 +90,13 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
               child: ElevatedButton(
                 onPressed: () => _navigateToInscriptionForm(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF51B37F),
+                  backgroundColor: beigeClair,
+                  foregroundColor: marron,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 ),
                 child: const Text(
                   "Inscription aux cours sur place (6-14 ans)",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
+                  style: TextStyle(fontSize: 16),
                 ),
               ),
             ),
@@ -95,7 +107,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
               height: 200,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: marron.withOpacity(0.3)),
               ),
               child: FlutterMap(
                 options: MapOptions(
@@ -113,9 +125,9 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
                         point: mosqueLocation,
                         width: 80,
                         height: 80,
-                        child: const Icon(
+                        child: Icon(
                           Icons.location_pin,
-                          color: Colors.red,
+                          color: marron,
                           size: 40,
                         ),
                       ),
@@ -127,43 +139,55 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
             const SizedBox(height: 20),
 
             // Horaires de prières
-            const Text(
+            Text(
               "Horaires de prières",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             ...prayerTimes.entries.map((entry) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),
               child: Text(
                 "${entry.key}: ${entry.value}",
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: marron),
               ),
             )),
             const SizedBox(height: 20),
 
             // Date Hijri
-            const Text(
+            Text(
               "Date du calendrier musulman",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               "Aujourd'hui: ${getHijriDate()}",
-              style: const TextStyle(fontSize: 16),
+              style: TextStyle(fontSize: 16, color: marron),
             ),
             const SizedBox(height: 20),
 
             // Événements
-            const Text(
+            Text(
               "Prochains événements",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             ...upcomingEvents.map((event) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4.0),
               child: Text(
                 "• $event",
-                style: const TextStyle(fontSize: 16),
+                style: TextStyle(fontSize: 16, color: marron),
               ),
             )),
           ],
@@ -171,8 +195,9 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF51B37F),
-        unselectedItemColor: Colors.grey,
+        backgroundColor: beigeClair,
+        selectedItemColor: marron,
+        unselectedItemColor: marron.withOpacity(0.6),
         currentIndex: _currentIndex,
         onTap: (index) {
           setState(() {

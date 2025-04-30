@@ -47,6 +47,9 @@ dependencies:
   intl: ^0.20.2
   font_awesome_flutter: ^10.8.0
   shared_preferences: ^2.5.3
+  youtube_player_flutter: ^9.1.1
+  assets_audio_player: ^3.1.1
+  flutter_tts: ^4.2.2
 #  flutter_zoom_sdk: ^1.1.0+4
 
 dev_dependencies:
@@ -108,6 +111,7 @@ flutter:
        fonts:
          - asset: fonts/Amiri-Regular.ttf
          - asset: fonts/Amiri-Bold.ttf
+#         - asset: fonts/arabic_font.ttf
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
