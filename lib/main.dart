@@ -10,6 +10,7 @@ import 'package:daara_digitale/pages/inscriptioncoranconfirme.dart';
 import 'package:daara_digitale/pages/inscriptionfikh.dart';
 import 'package:daara_digitale/pages/inscriptionfikhconfirme.dart';
 import 'package:daara_digitale/pages/khotba.dart';
+import 'package:daara_digitale/pages/khutbah.dart';
 import 'package:daara_digitale/pages/login.dart';
 import 'package:daara_digitale/pages/mosquee_assalam.dart';
 import 'package:daara_digitale/pages/projet_madrassa.dart';
@@ -53,7 +54,8 @@ class MyApp extends StatelessWidget {
         '/register': (context) => const Register(),
         '/login': (context) => const Login(),
         '/formulaireinscription': (context) => const FormulaireInscription(),
-        '/khotba': (context) =>  Khotba(),
+        // '/khotba': (context) =>  Khotba(),
+        '/khutbah': (context) =>  Khutbah(),
         '/projet_madrassa': (context) => const ProjetMadrassa(),
         '/biographie': (context) => const DaarayDigitalApp(),
       },

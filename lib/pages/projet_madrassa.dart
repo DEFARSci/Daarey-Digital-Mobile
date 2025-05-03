@@ -9,8 +9,13 @@ class ProjetMadrassa extends StatefulWidget {
 }
 
 class _ProjetMadrassaState extends State<ProjetMadrassa> {
+  // Couleurs
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   final double targetAmount = 100000.0;
-  double collectedAmount = 42500.0; // Montant déjà collecté (exemple)
+  double collectedAmount = 42500.0;
 
   final String pdfPlanUrl = 'https://example.com/plan_madrassa.pdf';
   final String donationUrl = 'https://example.com/dons-madrassa';
@@ -40,9 +45,12 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
     final progressPercentage = (collectedAmount / targetAmount) * 100;
 
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text('Projet Madrassa Sénégal'),
         centerTitle: true,
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -53,7 +61,7 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.asset(
-                'assets/madrassa.jpg', // Remplacez par votre image
+                'assets/images/ecole.jpg',
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.cover,
@@ -62,24 +70,35 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
             const SizedBox(height: 20),
 
             // Description du projet
-            const Text(
+            Text(
               'Description du projet',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Le projet Madrassa au Sénégal vise à construire une école islamique moderne dans la région de Dakar. '
                   'Ce centre éducatif accueillera 300 élèves et offrira un programme équilibré entre enseignement religieux '
                   'et matières académiques standards. Le complexe comprendra des salles de classe, une bibliothèque, '
                   'un espace de prière et des installations sportives.',
-              style: TextStyle(fontSize: 16),
+              style: TextStyle(
+                fontSize: 16,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 20),
 
             // Plan de l'école
-            const Text(
+            Text(
               'Plan du projet',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             ElevatedButton.icon(
@@ -87,36 +106,44 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
               label: const Text('Voir les plans PDF'),
               onPressed: _launchPdf,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red[700],
+                backgroundColor: marron,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
             const SizedBox(height: 20),
 
             // Objectif de collecte
-            const Text(
+            Text(
               'Objectif de financement',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               '${collectedAmount.toStringAsFixed(0)}€ / ${targetAmount.toStringAsFixed(0)}€',
-              style: const TextStyle(fontSize: 18),
+              style: TextStyle(
+                fontSize: 18,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             LinearProgressIndicator(
               value: progressPercentage / 100,
               minHeight: 20,
-              backgroundColor: Colors.grey[300],
+              backgroundColor: beigeClair,
               valueColor: AlwaysStoppedAnimation<Color>(
-                progressPercentage >= 100 ? Colors.green : Colors.blue,
+                progressPercentage >= 100 ? Colors.green : marron,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               '${progressPercentage.toStringAsFixed(1)}% de l\'objectif atteint',
               style: TextStyle(
-                color: progressPercentage >= 100 ? Colors.green : Colors.blue,
+                color: progressPercentage >= 100 ? Colors.green : marron,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -129,7 +156,8 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
                 label: const Text('Faire un don spécifique au projet'),
                 onPressed: _launchDonation,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF51B37F),
+                  backgroundColor: marron,
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                   textStyle: const TextStyle(fontSize: 18),
                 ),
@@ -137,10 +165,14 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
             ),
             const SizedBox(height: 20),
 
-            // Galerie photo (optionnel)
-            const Text(
+            // Galerie photo
+            Text(
               'Avancement des travaux',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: marron,
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -148,21 +180,21 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
-                  _buildProgressImage('assets/construction1.jpg'),
-                  _buildProgressImage('assets/construction2.jpg'),
-                  _buildProgressImage('assets/construction3.jpg'),
+                  _buildProgressImage('assets/images/ecole.jpg'),
+                  _buildProgressImage('assets/images/ecole.jpg'),
+                  _buildProgressImage('assets/images/ecole.jpg'),
                 ],
               ),
             ),
           ],
         ),
       ),
-      // Barre de navigation identique aux autres pages
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF51B37F),
-        unselectedItemColor: Colors.grey,
-        currentIndex: 3, // Index pour Projet Madrassa
+        backgroundColor: beigeClair,
+        selectedItemColor: marron,
+        unselectedItemColor: marron.withOpacity(0.6),
+        currentIndex: 3,
         onTap: (index) {
           switch (index) {
             case 0:
@@ -175,10 +207,9 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
               break;
             case 2:
               Navigator.pushNamedAndRemoveUntil(
-                  context, '/khotba', (route) => false);
+                  context, '/khutbah', (route) => false);
               break;
             case 3:
-            // Déjà sur la page Projet Madrassa
               break;
           }
         },

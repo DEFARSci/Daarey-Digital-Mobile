@@ -48,8 +48,11 @@ dependencies:
   font_awesome_flutter: ^10.8.0
   shared_preferences: ^2.5.3
   youtube_player_flutter: ^9.1.1
-  assets_audio_player: ^3.1.1
+#  assets_audio_player: ^3.1.1
   flutter_tts: ^4.2.2
+  pdf: ^3.11.3
+  path_provider: ^2.1.5
+  open_file: ^3.5.10
 #  flutter_zoom_sdk: ^1.1.0+4
 
 dev_dependencies:

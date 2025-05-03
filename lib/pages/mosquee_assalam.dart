@@ -213,7 +213,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
               break;
             case 2:
               Navigator.pushNamedAndRemoveUntil(
-                  context, '/khotba', (route) => false);
+                  context, '/khutbah', (route) => false);
               break;
             case 3:
               Navigator.pushNamedAndRemoveUntil(
