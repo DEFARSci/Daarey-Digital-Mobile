@@ -15,14 +15,9 @@ class _FaqState extends State<Faq> {
   static const Color beigeMoyen = Color(0xFFE1DED5);
   static const Color marron = Color(0xFF5D4C3B);
 
-  int _currentThemeIndex = 0;
   List<dynamic> faqData = [];
   bool isLoading = true;
   bool _isLoggedIn = false;
-
-  final List<String> themes = [
-    'Coran', 'Sounah', 'Prières', 'l\'Islam', 'le couple', 'le travail', '...'
-  ];
 
   @override
   void initState() {
@@ -40,27 +35,28 @@ class _FaqState extends State<Faq> {
 
   Future<void> _fetchFAQ() async {
     try {
-      final response = await http.get(Uri.parse("https://www.hadith.defarsci.fr/api/faq")).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(Uri.parse("https://www.hadith.defarsci.fr/api/faq"))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
         if (mounted) {
           setState(() {
-            faqData = decodedResponse['data'] ?? decodedResponse['faq'] ?? decodedResponse['questions'] ?? decodedResponse;
+            faqData = decodedResponse['data'] ??
+                decodedResponse['faq'] ??
+                decodedResponse['questions'] ??
+                decodedResponse;
             isLoading = false;
           });
         }
       } else {
-        if (mounted) {
-          setState(() => isLoading = false);
-        }
-        _showErrorSnackbar("Erreur de chargement: \${response.statusCode}");
+        if (mounted) setState(() => isLoading = false);
+        _showErrorSnackbar("Erreur de chargement : ${response.statusCode}");
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => isLoading = false);
-      }
+      if (mounted) setState(() => isLoading = false);
       _showErrorSnackbar("Erreur de connexion");
-      debugPrint("Erreur FAQ: \$e");
+      debugPrint("Erreur FAQ: $e");
     }
   }
 
@@ -89,47 +85,22 @@ class _FaqState extends State<Faq> {
     }
   }
 
-  Widget _buildThemeChips() {
-    return SizedBox(
-      height: 50,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: themes.length,
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Text(themes[index]),
-              selected: _currentThemeIndex == index,
-              selectedColor: marron,
-              labelStyle: TextStyle(
-                color: _currentThemeIndex == index ? beigeClair : marron,
-              ),
-              onSelected: (selected) {
-                if (selected) {
-                  setState(() => _currentThemeIndex = index);
-                }
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildFAQContent() {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
+
     if (faqData.isEmpty) {
       return const Center(child: Text("Aucune question disponible pour le moment"));
     }
+
     return ListView.builder(
       itemCount: faqData.length,
       itemBuilder: (context, index) {
         final item = faqData[index];
         final question = item['question'] ?? item['titre'] ?? item['text'] ?? "Question sans titre";
         final answer = item['answer'] ?? item['reponse'] ?? item['content'] ?? "Réponse non disponible";
+
         return ExpansionTile(
           title: Text(
             question,
@@ -160,10 +131,10 @@ class _FaqState extends State<Faq> {
         backgroundColor: beigeClair,
         foregroundColor: marron,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.search),
+          //   onPressed: () {},
+          // ),
           if (_isLoggedIn)
             IconButton(
               icon: const Icon(Icons.logout),
@@ -171,13 +142,7 @@ class _FaqState extends State<Faq> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildThemeChips(),
-          const Divider(height: 1),
-          Expanded(child: _buildFAQContent()),
-        ],
-      ),
+      body: _buildFAQContent(),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: beigeClair,
@@ -210,7 +175,8 @@ class _FaqState extends State<Faq> {
           const BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
           const BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contribution"),
           const BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
-          BottomNavigationBarItem(icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock), label: "Salon privé"),
+          BottomNavigationBarItem(
+              icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock), label: "Salon privé"),
           const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
         ],
       ),

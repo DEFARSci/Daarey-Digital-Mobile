@@ -4,6 +4,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'event_details.dart';
 
 class Accueil extends StatefulWidget {
   const Accueil({super.key});
@@ -31,6 +32,7 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
     _initializeVideoPlayerFuture = _videoController.initialize().then((_) {
       _videoController.setLooping(true);
     });
+
     _checkLoginStatus();
     _loadData();
   }
@@ -67,6 +69,21 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
     }
   }
 
+  @override
+  void dispose() {
+    _videoController.pause();
+    _videoController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _videoController.pause();
+    }
+  }
+
   Widget _buildVideoSection() {
     return FutureBuilder(
       future: _initializeVideoPlayerFuture,
@@ -88,11 +105,9 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
                     ),
                     onPressed: () {
                       setState(() {
-                        if (_videoController.value.isPlaying) {
-                          _videoController.pause();
-                        } else {
-                          _videoController.play();
-                        }
+                        _videoController.value.isPlaying
+                            ? _videoController.pause()
+                            : _videoController.play();
                       });
                     },
                   ),
@@ -112,7 +127,7 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 22,
           fontWeight: FontWeight.bold,
           color: marron,
@@ -123,7 +138,7 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
 
   Widget _buildActualiteItem(dynamic actualite) {
     return Card(
-      color: beigeClair,
+      color: marron,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       elevation: 2,
@@ -131,13 +146,7 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
         leading: actualite['image'] != null
             ? ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            actualite['image'],
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(Icons.article, size: 40, color: beigeClair),
-          ),
+          child: Image.network(actualite['image'], width: 60, height: 60, fit: BoxFit.cover),
         )
             : Icon(Icons.article, size: 40, color: beigeClair),
         title: Text(
@@ -158,41 +167,34 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       elevation: 2,
-      child: ListTile(
-        leading: event['image_url'] != null
-            ? ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            "https://www.hadith.defarsci.fr/images/${event['image_url']}",
-            width: 60,
-            height: 60,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(Icons.event, size: 40, color: beigeClair),
-          ),
-        )
-            : Icon(Icons.event, size: 40, color: marron),
-        title: Text(
-          event['title'] ?? "Titre inconnu",
-          style: TextStyle(fontWeight: FontWeight.bold, color: marron),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => EventDetailsPage(event: event)),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              event['content'] ?? "Sans description",
-              style: TextStyle(color: marron.withOpacity(0.8)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+        child: ListTile(
+          leading: event['image_url'] != null
+              ? ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              "https://www.hadith.defarsci.fr/images/${event['image_url']}",
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
             ),
-            if (event['date'] != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  "Le ${event['date']}",
-                  style: TextStyle(fontSize: 12, color: marron.withOpacity(0.6)),
-                ),
-              ),
-          ],
+          )
+              : Icon(Icons.event, size: 40, color: marron),
+          title: Text(
+            event['title'] ?? "Titre inconnu",
+            style: TextStyle(fontWeight: FontWeight.bold, color: marron),
+          ),
+          subtitle: Text(
+            event['content'] ?? "Sans description",
+            style: TextStyle(color: marron.withOpacity(0.8)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Icon(Icons.chevron_right, color: marron),
         ),
       ),
     );
@@ -206,33 +208,17 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
       'assets/images/coran.jpg',
     ];
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: CarouselSlider(
-        options: CarouselOptions(
-          height: 200,
-          autoPlay: true,
-          enlargeCenterPage: true,
-          viewportFraction: 0.8,
+    return CarouselSlider(
+      options: CarouselOptions(height: 200, autoPlay: true, enlargeCenterPage: true),
+      items: images
+          .map((img) => Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          image: DecorationImage(image: AssetImage(img), fit: BoxFit.cover),
         ),
-        items: images.map((imagePath) {
-          return Builder(
-            builder: (BuildContext context) {
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: marron.withOpacity(0.3), width: 2),
-                  image: DecorationImage(
-                    image: AssetImage(imagePath),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              );
-            },
-          );
-        }).toList(),
-      ),
+      ))
+          .toList(),
     );
   }
 
@@ -248,75 +234,26 @@ class _AccueilState extends State<Accueil> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: beigeMoyen,
-      appBar: AppBar(
-        title: const Text("Accueil"),
-        centerTitle: true,
-        backgroundColor: beigeClair,
-        foregroundColor: marron,
-        actions: [
-          if (_isLoggedIn)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.remove('auth_token');
-                setState(() => _isLoggedIn = false);
-              },
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text("Accueil"), backgroundColor: beigeClair, foregroundColor: marron),
       body: RefreshIndicator(
-        color: marron,
-        backgroundColor: beigeClair,
-        onRefresh: () async {
-          _loadData();
-          await _checkLoginStatus();
-        },
+        onRefresh: () async => _loadData(),
         child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildVideoSection(),
-              _buildSectionTitle("Nos actualités"),
-              FutureBuilder<List<dynamic>>(
+          child: Column(children: [
+            _buildVideoSection(),
+            _buildSectionTitle("Nos actualités"),
+            FutureBuilder<List<dynamic>>(
                 future: _actualites,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator(color: marron));
-                  }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text("Aucune actualité disponible", style: TextStyle(color: marron)),
-                    );
-                  }
-                  return Column(
-                    children: snapshot.data!.map((item) => _buildActualiteItem(item)).toList(),
-                  );
-                },
-              ),
-              _buildSectionTitle("Événements à venir"),
-              FutureBuilder<List<dynamic>>(
+                builder: (_, snapshot) => snapshot.hasData
+                    ? Column(children: snapshot.data!.map(_buildActualiteItem).toList())
+                    : CircularProgressIndicator(color: marron)),
+            _buildSectionTitle("Événements à venir"),
+            FutureBuilder<List<dynamic>>(
                 future: _events,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator(color: marron));
-                  }
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text("Aucun événement à venir", style: TextStyle(color: marron)),
-                    );
-                  }
-                  return Column(
-                    children: snapshot.data!.map((item) => _buildEventItem(item)).toList(),
-                  );
-                },
-              ),
-              _buildImageCarousel(),
-            ],
-          ),
+                builder: (_, snapshot) => snapshot.hasData
+                    ? Column(children: snapshot.data!.map(_buildEventItem).toList())
+                    : CircularProgressIndicator(color: marron)),
+            _buildImageCarousel(),
+          ]),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(

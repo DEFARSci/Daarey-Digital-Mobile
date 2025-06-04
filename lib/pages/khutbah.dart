@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -14,76 +16,54 @@ class Khutbah extends StatefulWidget {
 }
 
 class _KhutbahState extends State<Khutbah> {
-  // Couleurs
   static const Color beigeClair = Color(0xFFF3EEE1);
   static const Color beigeMoyen = Color(0xFFE1DED5);
   static const Color marron = Color(0xFF5D4C3B);
 
-  // Contrôleur TTS
   final FlutterTts flutterTts = FlutterTts();
   bool isPlaying = false;
   int? currentlyPlayingIndex;
 
-  int _currentIndex = 2; // Index pour la page Khutbah
+  int _currentIndex = 2;
 
-  // Liste des khutbahs
-  final List<Map<String, dynamic>> khutbahList = [
-    {
-      'title': 'L\'importance de la patience',
-      'titleAr': 'أهمية الصبر',
-      'date': '10 Ramadan 1445',
-      'category': 'Vie spirituelle',
-      'textFr': """
-**Introduction :**
-Au nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux.
-
-La patience (As-Sabr) est une vertu centrale en Islam. Allah dit dans le Coran : 
-"Ô vous qui croyez ! Cherchez secours dans la patience et la Salât, car Allah est avec ceux qui sont patients." (Sourate Al-Baqarah, 2:153)
-
-**Développement :**
-1. La patience face aux épreuves
-2. La patience dans l'obéissance à Allah
-3. La patience pour s'éloigner des péchés
-
-**Conclusion :**
-Le Prophète (ﷺ) a dit : "Quiconque s'efforce d'être patient, Allah lui donnera la patience." (Bukhari)
-""",
-      'textAr': """
-**المقدمة :**
-بسم الله الرحمن الرحيم
-
-الصبر من أعظم الفضائل في الإسلام. قال تعالى: 
-"يَا أَيُّهَا الَّذِينَ آمَنُوا اسْتَعِينُوا بِالصَّبْرِ وَالصَّلَاةِ ۚ إِنَّ اللَّهَ مَعَ الصَّابِرِينَ" (البقرة: 153)
-
-**المحتوى :**
-١. الصبر على الابتلاءات
-٢. الصبر على طاعة الله
-٣. الصبر عن المعاصي
-
-**الخاتمة :**
-قال النبي ﷺ: "ومن يتصبر يصبره الله" (البخاري)
-""",
-    },
-    {
-      'title': 'Les mérites du Ramadan',
-      'titleAr': 'فضائل رمضان',
-      'date': '1 Ramadan 1445',
-      'category': 'Ramadan',
-      'textFr': """
-**Introduction :**
-Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
-""",
-      'textAr': """
-**المقدمة :**
-شهر رمضان شهر مبارك تُفتح فيه أبواب الجنة...
-""",
-    },
-  ];
+  List<dynamic> khutbahList = [];
+  List<dynamic> filteredList = [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _initTts();
+    _fetchKhutbahs();
+    _searchController.addListener(_filterKhutbahs);
+  }
+
+  Future<void> _fetchKhutbahs() async {
+    try {
+      final response = await http.get(Uri.parse("https://www.hadith.defarsci.fr/api/khoutbas"));
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        final List data = jsonData['data'];
+        setState(() {
+          khutbahList = data;
+          filteredList = data;
+        });
+      } else {
+        throw Exception("Erreur de chargement des khoutbas");
+      }
+    } catch (e) {
+      debugPrint("Erreur API: $e");
+    }
+  }
+
+  void _filterKhutbahs() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      filteredList = khutbahList.where((khutbah) {
+        return khutbah['titre'].toString().toLowerCase().contains(query) ||
+            khutbah['contenu'].toString().toLowerCase().contains(query);
+      }).toList();
+    });
   }
 
   Future<void> _initTts() async {
@@ -119,16 +99,12 @@ Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Header(level: 0, text: khutbah['title']),
-              pw.Header(level: 1, text: khutbah['titleAr']),
+              pw.Header(level: 0, text: khutbah['titre'] ?? ''),
               pw.SizedBox(height: 20),
-              pw.Text('Date: ${khutbah['date']}'),
+              pw.Text("Date: ${khutbah['date'] ?? ''}"),
               pw.Divider(),
-              pw.Header(level: 2, text: 'Français'),
-              pw.Text(khutbah['textFr']),
-              pw.SizedBox(height: 20),
-              pw.Header(level: 2, text: 'العربية'),
-              pw.Text(khutbah['textAr'], textDirection: pw.TextDirection.rtl),
+              pw.Header(level: 2, text: 'Contenu'),
+              pw.Text(_htmlToPlainText(khutbah['contenu'] ?? '')),
             ],
           );
         },
@@ -136,9 +112,15 @@ Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
     );
 
     final output = await getTemporaryDirectory();
-    final file = File("${output.path}/${khutbah['title']}.pdf");
+    final file = File("${output.path}/${khutbah['titre']}.pdf");
     await file.writeAsBytes(await pdf.save());
     OpenFile.open(file.path);
+  }
+
+  String _htmlToPlainText(String? htmlString) {
+    if (htmlString == null) return '';
+    final regex = RegExp(r'<[^>]*>', multiLine: true, caseSensitive: false);
+    return htmlString.replaceAll(regex, '').replaceAll('&nbsp;', ' ').trim();
   }
 
   @override
@@ -157,103 +139,95 @@ Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
         backgroundColor: beigeClair,
         foregroundColor: marron,
       ),
-      body: ListView.builder(
-        itemCount: khutbahList.length,
-        itemBuilder: (context, index) {
-          final khutbah = khutbahList[index];
-          return Card(
-            margin: const EdgeInsets.all(8.0),
-            color: beigeClair,
-            child: ExpansionTile(
-              title: Text(
-                khutbah['title'],
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: marron,
-                ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Rechercher un sermon...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: beigeClair,
               ),
-              subtitle: Text(
-                khutbah['date'],
-                style: TextStyle(color: marron.withOpacity(0.6)),
-              ),
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: filteredList.length,
+              itemBuilder: (context, index) {
+                final khutbah = filteredList[index];
+                return Card(
+                  margin: const EdgeInsets.all(8.0),
+                  color: beigeClair,
+                  child: ExpansionTile(
+                    title: Text(
+                      khutbah['titre'] ?? '',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: marron),
+                    ),
+                    subtitle: Text(
+                      khutbah['date'] ?? '',
+                      style: TextStyle(color: marron.withOpacity(0.6)),
+                    ),
                     children: [
-                      // Section Français avec bouton audio
-                      _buildTextSection(
-                        title: 'Français',
-                        text: khutbah['textFr'],
-                        language: 'fr',
-                        isActive: currentlyPlayingIndex == index && isPlaying,
-                        onPlay: () {
-                          setState(() {
-                            currentlyPlayingIndex = index;
-                            isPlaying = true;
-                          });
-                          _speak(khutbah['textFr'], 'fr');
-                        },
-                        onStop: _stop,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Section Arabe avec bouton audio
-                      _buildTextSection(
-                        title: 'العربية',
-                        text: khutbah['textAr'],
-                        language: 'ar',
-                        isActive: currentlyPlayingIndex == index && isPlaying,
-                        onPlay: () {
-                          setState(() {
-                            currentlyPlayingIndex = index;
-                            isPlaying = true;
-                          });
-                          _speak(khutbah['textAr'], 'ar');
-                        },
-                        onStop: _stop,
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Boutons d'action
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.download),
-                              label: const Text('Télécharger PDF'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: marron,
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () => _generateAndSavePdf(khutbah),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              icon: const Icon(Icons.share),
-                              label: const Text('Partager'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: marron.withOpacity(0.8),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () {
-                                // Fonctionnalité de partage
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            _buildTextSection(
+                              title: 'Contenu',
+                              text: _htmlToPlainText(khutbah['contenu'] ?? ''),
+                              language: 'fr',
+                              isActive: currentlyPlayingIndex == index && isPlaying,
+                              onPlay: () {
+                                setState(() {
+                                  currentlyPlayingIndex = index;
+                                  isPlaying = true;
+                                });
+                                _speak(_htmlToPlainText(khutbah['contenu'] ?? ''), 'fr');
                               },
+                              onStop: _stop,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 20),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.download),
+                                    label: const Text('Télécharger PDF'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: marron,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () => _generateAndSavePdf(khutbah),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    icon: const Icon(Icons.share),
+                                    label: const Text('Partager'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: marron.withOpacity(0.8),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    onPressed: () {},
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                );
+              },
             ),
-          );
-        },
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -267,19 +241,15 @@ Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
           });
           switch (index) {
             case 0:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(context, '/cours', (route) => false);
               break;
             case 1:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/mosquee', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(context, '/mosquee', (route) => false);
               break;
             case 2:
-            // Reste sur la page actuelle (Khutbah)
               break;
             case 3:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/projet_madrassa', (route) => false);
+              Navigator.pushNamedAndRemoveUntil(context, '/projet_madrassa', (route) => false);
               break;
           }
         },
@@ -330,10 +300,7 @@ Le mois de Ramadan est un mois béni où les portes du Paradis sont ouvertes...
         const SizedBox(height: 8),
         Text(
           text,
-          style: TextStyle(
-            color: marron,
-            fontSize: language == 'ar' ? 18 : 16,
-          ),
+          style: TextStyle(color: marron, fontSize: language == 'ar' ? 18 : 16),
           textDirection: language == 'ar' ? TextDirection.rtl : TextDirection.ltr,
         ),
       ],

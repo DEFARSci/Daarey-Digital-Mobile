@@ -206,7 +206,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
           switch (index) {
             case 0:
               Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (route) => false);
+                  context, '/cours', (route) => false);
               break;
             case 1:
             // Reste sur la page actuelle (Mosquée)

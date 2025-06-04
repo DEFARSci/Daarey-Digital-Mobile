@@ -73,8 +73,11 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (responseData["success"] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Inscription réussie !")),
+            const SnackBar(content: Text("Réservation envoyée à votre adresse mail !")),
           );
+          // Redirection vers la page des cours après 1 seconde
+          await Future.delayed(const Duration(seconds: 1));
+          Navigator.pushReplacementNamed(context, '/cours');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Erreur: ${responseData["message"]}")),

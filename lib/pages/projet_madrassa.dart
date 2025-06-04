@@ -199,7 +199,7 @@ class _ProjetMadrassaState extends State<ProjetMadrassa> {
           switch (index) {
             case 0:
               Navigator.pushNamedAndRemoveUntil(
-                  context, '/', (route) => false);
+                  context, '/cours', (route) => false);
               break;
             case 1:
               Navigator.pushNamedAndRemoveUntil(

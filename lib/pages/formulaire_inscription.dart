@@ -12,6 +12,11 @@ class FormulaireInscription extends StatefulWidget {
 }
 
 class _FormulaireInscriptionState extends State<FormulaireInscription> {
+  // Couleurs
+  static const Color beigeClair = Color(0xFFF3EEE1);
+  static const Color beigeMoyen = Color(0xFFE1DED5);
+  static const Color marron = Color(0xFF5D4C3B);
+
   final _formKey = GlobalKey<FormState>();
 
   final _prenomController = TextEditingController();
@@ -157,10 +162,12 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: beigeMoyen,
       appBar: AppBar(
         title: const Text("Inscription"),
         centerTitle: true,
-        backgroundColor: const Color(0xFF51B37F),
+        backgroundColor: beigeClair,
+        foregroundColor: marron,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -174,14 +181,28 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
                 value: _selectedGenre,
                 items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
                 onChanged: (value) => setState(() => _selectedGenre = value!),
-                decoration: const InputDecoration(labelText: "Genre *"),
+                decoration: InputDecoration(
+                  labelText: "Genre *",
+                  labelStyle: TextStyle(color: marron),
+                  filled: true,
+                  fillColor: beigeClair,
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
+                  ),
+                ),
               ),
               _buildTextField(_telephoneController, "Téléphone *", keyboardType: TextInputType.phone),
               TextFormField(
                 controller: _dateNaissanceController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Date de naissance *",
-                  suffixIcon: Icon(Icons.calendar_today),
+                  labelStyle: TextStyle(color: marron),
+                  filled: true,
+                  fillColor: beigeClair,
+                  suffixIcon: Icon(Icons.calendar_today, color: marron),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
+                  ),
                 ),
                 readOnly: true,
                 onTap: () => _selectDate(context),
@@ -189,7 +210,8 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
               _buildTextField(_lieuNaissanceController, "Lieu de naissance *"),
               _buildTextField(_adresseController, "Adresse *"),
               const SizedBox(height: 20),
-              const Text("Informations du tuteur", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Informations du tuteur",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: marron, fontSize: 18)),
               _buildTextField(_tuteurPrenomController, "Prénom *"),
               _buildTextField(_tuteurNomController, "Nom *"),
               _buildTextField(_tuteurProfessionController, "Profession"),
@@ -197,7 +219,8 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
               _buildTextField(_tuteurAdresseController, "Adresse"),
               _buildTextField(_tuteurEmailController, "Email *", keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 20),
-              const Text("Contact d'urgence", style: TextStyle(fontWeight: FontWeight.bold)),
+              Text("Contact d'urgence",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: marron, fontSize: 18)),
               _buildTextField(_urgenceNomController, "Nom complet *"),
               _buildTextField(_urgenceLienController, "Lien de parenté *"),
               _buildTextField(_urgenceTelephoneController, "Téléphone *", keyboardType: TextInputType.phone),
@@ -206,13 +229,26 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
                 value: _selectedPaiement,
                 items: modesPaiement.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                 onChanged: (value) => setState(() => _selectedPaiement = value!),
-                decoration: const InputDecoration(labelText: "Mode de paiement"),
+                decoration: InputDecoration(
+                  labelText: "Mode de paiement",
+                  labelStyle: TextStyle(color: marron),
+                  filled: true,
+                  fillColor: beigeClair,
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
+                  ),
+                ),
               ),
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: _submitForm,
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF51B37F)),
-                child: const Text("Soumettre l'inscription", style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: marron,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text("Soumettre l'inscription", style: TextStyle(fontSize: 18)),
               ),
             ],
           ),
@@ -228,7 +264,15 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
       child: TextFormField(
         controller: controller,
         keyboardType: keyboardType,
-        decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: marron),
+          filled: true,
+          fillColor: beigeClair,
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: marron.withOpacity(0.3)),
+          ),
+        ),
         validator: (value) {
           if (label.contains('*') && (value == null || value.trim().isEmpty)) {
             return "Ce champ est requis";

@@ -18,6 +18,9 @@ import 'package:daara_digitale/pages/register.dart';
 import 'package:daara_digitale/pages/salle_cours.dart';
 import 'package:daara_digitale/pages/salonprive.dart';
 import 'package:flutter/material.dart';
+import 'package:daara_digitale/pages/mosquee_assalam.dart';
+import 'package:daara_digitale/pages/khutbah.dart';
+
 
 import 'pages/biographie.dart';
 
