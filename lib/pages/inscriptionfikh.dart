@@ -16,80 +16,157 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _dateNaissanceController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
-  final TextEditingController _dateCoursController = TextEditingController();
-  String? _selectedGenre = "Male";
-  List<String> selectedHours = [];
 
+  String? _selectedGenre = "Male";
+
+  // Liste des créneaux récupérés, chaque entrée contient { "id", "heure", "date" }
+  List<Map<String, dynamic>> _timeSlots = [];
+  bool _isLoadingSlots = false;
+  int? _selectedSlotId; // ID du créneau choisi
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTimeSlots();
+  }
+
+  /// Récupère les créneaux “débutant/fiqh” depuis l’API :
+  /// GET https://www.hadith.defarsci.fr/api/cours/debutant/fiqh
+  /// Chaque clé du JSON est une date (texte) et chaque valeur contient un champ "cours" (une liste).
+  /// Pour chaque cours, on extrait id, heure et date_complete (ou la clé si date_complete manquante).
+  Future<void> _fetchTimeSlots() async {
+    setState(() {
+      _isLoadingSlots = true;
+    });
+
+    try {
+      final uri = Uri.parse("https://www.hadith.defarsci.fr/api/cours/debutant/fiqh");
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+
+        // Liste temporaire pour stocker { "id", "heure", "date" }
+        final List<Map<String, dynamic>> slotsAvecDate = [];
+
+        if (decoded is Map<String, dynamic>) {
+          // Parcourir chaque entrée ; clé = date (texte), valeur contient "cours" (liste)
+          decoded.forEach((keyDate, value) {
+            if (value is Map<String, dynamic> && value.containsKey("cours")) {
+              // date_complete si présent, sinon on prend la clé textuelle
+              final String dateComplete = (value["date_complete"] as String?) ?? keyDate;
+              final coursList = value["cours"];
+              if (coursList is List) {
+                for (var coursItem in coursList) {
+                  slotsAvecDate.add({
+                    "id":    coursItem["id"] as int,
+                    "heure": coursItem["heure"] as String,
+                    "date":  dateComplete,
+                  });
+                }
+              }
+            }
+          });
+        }
+        // Si besoin, gérer d’autres formats ici…
+
+        setState(() {
+          _timeSlots = slotsAvecDate;
+          _isLoadingSlots = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingSlots = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+            Text("Erreur ${response.statusCode} lors de la récupération des créneaux"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingSlots = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Échec de récupération des créneaux : $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Envoie le formulaire au endpoint d’inscription “fiqhInscriptions”
   Future<void> _submitForm() async {
     // Vérification que tous les champs sont remplis
     if (_nameController.text.isEmpty ||
         _prenomController.text.isEmpty ||
+        _emailController.text.isEmpty ||
         _dateNaissanceController.text.isEmpty ||
         _telephoneController.text.isEmpty ||
-        _dateCoursController.text.isEmpty ||
-        selectedHours.isEmpty) {
+        _selectedSlotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez remplir tous les champs")),
+        const SnackBar(content: Text("Veuillez remplir tous les champs et choisir un créneau")),
       );
       return;
     }
 
-    // URL de l'API
-    var url = Uri.parse("https://www.hadith.defarsci.fr/api/fiqh-inscription/débutant");
+    // URL du backend (vérifiez la route exacte côté serveur)
+    final url = Uri.parse("https://www.hadith.defarsci.fr/api/fiqhInscriptions");
 
-    // Données à envoyer
-    Map<String, dynamic> data = {
-      "first_name": _prenomController.text,
-      "last_name": _nameController.text,
-      "date_naissance": _dateNaissanceController.text,
-      "genre": _selectedGenre,
-      "phone": _telephoneController.text,
-      "date_cours": _dateCoursController.text,
-      "heure_cours": selectedHours.join(", "), // Convertit la liste en chaîne
+    final Map<String, dynamic> data = {
+      "first_name":     _prenomController.text.trim(),
+      "last_name":      _nameController.text.trim(),
+      "date_naissance": _dateNaissanceController.text.trim(),
+      "genre":          _selectedGenre,
+      "phone":          _telephoneController.text.trim(),
+      "email":          _emailController.text.trim(),
+      "cours_id":       _selectedSlotId,
     };
 
-    // Log des données envoyées
+    // Logs pour debug
+    print("URL: $url");
     print("Données envoyées: ${jsonEncode(data)}");
 
     try {
-      // Envoi de la requête POST
-      var response = await http.post(
+      final response = await http.post(
         url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode(data), // Encode les données en JSON
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(data),
       );
 
-      // Log de la réponse
       print("Statut HTTP: ${response.statusCode}");
       print("Réponse du serveur: ${response.body}");
 
-      var responseData = jsonDecode(response.body);
+      final responseData = jsonDecode(response.body);
 
-      // Gestion de la réponse
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (responseData["success"] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Inscription réussie !")),
           );
+          // Si nécessaire, rediriger :
+          // Navigator.pushReplacementNamed(context, '/coursFikhConfirmes');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Erreur: ${responseData["message"]}")),
+            SnackBar(content: Text("Erreur : ${responseData["message"]}")),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur: ${response.body}")),
+          SnackBar(content: Text("Erreur : ${response.body}")),
         );
       }
     } catch (e) {
-      // Gestion des erreurs de connexion
       print("Erreur de connexion: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Échec de connexion: $e")),
+        SnackBar(content: Text("Échec de connexion : $e")),
       );
     }
   }
@@ -110,14 +187,14 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Genre
+              // ---------------- Sélection du genre ----------------
               Row(
                 children: [
-                  const Text("Genre: ", style: TextStyle(color: marron)),
+                  const Text("Genre : ", style: TextStyle(color: marron)),
                   Radio<String>(
                     value: "Male",
                     groupValue: _selectedGenre,
-                    onChanged: (value)  {
+                    onChanged: (value) {
                       setState(() {
                         _selectedGenre = value;
                       });
@@ -140,7 +217,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Nom
+              // ---------------- Champ Nom ----------------
               TextField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -151,7 +228,7 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Prénom
+              // ---------------- Champ Prénom ----------------
               TextField(
                 controller: _prenomController,
                 decoration: const InputDecoration(
@@ -162,9 +239,22 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 10),
 
-              // Date de naissance
+              // ---------------- Champ Email ----------------
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // ---------------- Champ Date de naissance ----------------
               TextField(
                 controller: _dateNaissanceController,
+                readOnly: true,
                 decoration: InputDecoration(
                   labelText: "Date de naissance",
                   border: const OutlineInputBorder(),
@@ -180,17 +270,17 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
                       if (selectedDate != null) {
                         setState(() {
                           _dateNaissanceController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
+                          "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
                         });
                       }
                     },
                   ),
-                  labelStyle: TextStyle(color: marron),
+                  labelStyle: const TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Numéro de téléphone
+              // ---------------- Champ Téléphone ----------------
               TextField(
                 controller: _telephoneController,
                 decoration: const InputDecoration(
@@ -201,94 +291,63 @@ class _InscriptionfikhState extends State<Inscriptionfikh> {
               ),
               const SizedBox(height: 20),
 
-              // Date du cours
-              TextField(
-                controller: _dateCoursController,
-                decoration: InputDecoration(
-                  labelText: "Date du cours",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () async {
-                      DateTime? selectedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2100),
-                      );
-                      if (selectedDate != null) {
-                        setState(() {
-                          _dateCoursController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
-                        });
-                      }
-                    },
-                  ),
-                  labelStyle: TextStyle(color: marron),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Plages horaires
+              // ---------------- Titre “Sélectionnez un créneau” ----------------
               const Text(
-                "Sélectionnez les horaires :",
+                "Sélectionnez un créneau :",
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
               ),
-              Wrap(
-                children: [
-                  buildCheckbox("9h-10h"),
-                  buildCheckbox("10h-11h"),
-                  buildCheckbox("11h-12h"),
-                  buildCheckbox("14h-15h"),
-                  buildCheckbox("15h-16h"),
-                  buildCheckbox("16h-17h"),
-                  buildCheckbox("19h-20h"),
-                  buildCheckbox("20h-21h"),
-                  buildCheckbox("21h-22h"),
-                ],
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
-              // Bouton de réservation
+              // Affichage du loader pendant la récupération
+              if (_isLoadingSlots)
+                const Center(child: CircularProgressIndicator())
+              // Si pas de créneau après chargement
+              else if (!_isLoadingSlots && _timeSlots.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    "Aucun créneau disponible",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                )
+              // Sinon, on affiche le Dropdown avec “date – heure”
+              else
+                DropdownButtonFormField<int>(
+                  value: _selectedSlotId,
+                  decoration: InputDecoration(
+                    labelText: "Choisir le créneau",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: _timeSlots.map((slot) {
+                    return DropdownMenuItem<int>(
+                      value: slot["id"] as int,
+                      child: Text("${slot["date"]} – ${slot["heure"]}"),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedSlotId = val;
+                    });
+                  },
+                ),
+
+              const SizedBox(height: 24),
+
+              // ---------------- Bouton “Réserver” ----------------
               Center(
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: beigeClair, foregroundColor: marron),
-                  onPressed: _submitForm, // Appel de la méthode _submitForm
-                  // style: ElevatedButton.styleFrom(
-                  //   padding: const EdgeInsets.symmetric(
-                  //       horizontal: 40, vertical: 15,
-                  //       backgroundColor: beigeClair, foregroundColor: marron),
-                  // ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: beigeClair,
+                    foregroundColor: marron,
+                  ),
+                  onPressed: _submitForm,
                   child: const Text("Réserver"),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget buildCheckbox(String time) {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Checkbox(
-            value: selectedHours.contains(time),
-            onChanged: (bool? selected) {
-              setState(() {
-                if (selected == true) {
-                  selectedHours.add(time);
-                } else {
-                  selectedHours.remove(time);
-                }
-              });
-            },
-          ),
-          Text(time, style: TextStyle(color: marron)),
-        ],
       ),
     );
   }

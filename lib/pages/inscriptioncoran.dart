@@ -14,85 +14,173 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
   static const Color beigeMoyen = Color(0xFFE1DED5);
   static const Color marron = Color(0xFF5D4C3B);
 
+  // Contrôleurs pour les champs de texte
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _dateNaissanceController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
-  final TextEditingController _dateCoursController = TextEditingController();
-  String? _selectedGenre = "Masculin";
-  List<String> selectedHours = [];
 
+  String? _selectedGenre = "Masculin";
+
+  // Liste des créneaux récupérés (avec "id", "heure" et "date")
+  List<Map<String, dynamic>> _timeSlots = [];
+  // Pour garder en mémoire les créneaux cochés (leurs IDs)
+  List<int> _selectedSlotIds = [];
+
+  bool _isLoadingSlots = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTimeSlots();
+  }
+
+  /// Récupère les créneaux horaires depuis l’API :
+  /// GET https://www.hadith.defarsci.fr/api/cours/debutant/coran
+  /// On extrait pour chaque cours : id, heure, et date_complete (ou la clé JSON si date_complete absente)
+  Future<void> _fetchTimeSlots() async {
+    setState(() {
+      _isLoadingSlots = true;
+    });
+
+    try {
+      final uri = Uri.parse("https://www.hadith.defarsci.fr/api/cours/debutant/coran");
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+
+        // Liste temporaire dans laquelle on stocke { "id", "heure", "date" }
+        final List<Map<String, dynamic>> slotsAvecDate = [];
+
+        if (decoded is Map<String, dynamic>) {
+          // Parcourir chaque entrée : la clé est le texte de la date (ex: "vendredi 27 juin 2025")
+          decoded.forEach((keyDate, value) {
+            if (value is Map<String, dynamic> && value.containsKey("cours")) {
+              // date_complete si présente, sinon on prend la clé elle-même
+              final String dateComplete = (value["date_complete"] as String?) ?? keyDate;
+              final coursList = value["cours"];
+              if (coursList is List) {
+                for (var coursItem in coursList) {
+                  slotsAvecDate.add({
+                    "id":   coursItem["id"] as int,
+                    "heure": coursItem["heure"] as String,
+                    "date": dateComplete,
+                  });
+                }
+              }
+            }
+          });
+        }
+
+        setState(() {
+          _timeSlots = slotsAvecDate;
+          _isLoadingSlots = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingSlots = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erreur ${response.statusCode} lors de la récupération des créneaux"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingSlots = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Échec de récupération des créneaux : $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  /// Soumet le formulaire vers l’endpoint exact (tout en minuscules) :
+  /// POST https://www.hadith.defarsci.fr/api/cours/coraninscriptions
   Future<void> _submitForm() async {
-    // Vérification que tous les champs sont remplis
+    // 1) Validation que tous les champs sont remplis
     if (_nameController.text.isEmpty ||
         _prenomController.text.isEmpty ||
+        _emailController.text.isEmpty ||
         _dateNaissanceController.text.isEmpty ||
         _telephoneController.text.isEmpty ||
-        _dateCoursController.text.isEmpty ||
-        selectedHours.isEmpty) {
+        _selectedSlotIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez remplir tous les champs")),
+        const SnackBar(content: Text("Veuillez remplir tous les champs et choisir un créneau")),
       );
       return;
     }
 
-    // URL de l'API
-    var url = Uri.parse("https://www.hadith.defarsci.fr/api/coran-inscriptions/débutant");
+    // 2) Récupérer l'ID du premier créneau sélectionné
+    final selectedCourseId = _selectedSlotIds.first;
 
-    // Données à envoyer
-    Map<String, dynamic> data = {
-      "first_name": _prenomController.text,
-      "last_name": _nameController.text,
-      "date_naissance": _dateNaissanceController.text,
-      "genre": _selectedGenre,
-      "phone": _telephoneController.text,
-      "date_cours": _dateCoursController.text,
-      "heure_cours": selectedHours.join(", "),
+    // 3) Construire l’URL EXACTE (tout en minuscules) pour éviter le 404
+    final url = Uri.parse("https://www.hadith.defarsci.fr/api/coranInscriptions");
+
+    // 4) Construire le JSON à envoyer (les clés doivent correspondre à ce que le backend attend)
+    final Map<String, dynamic> data = {
+      "first_name":     _prenomController.text.trim(),
+      "last_name":      _nameController.text.trim(),
+      "date_naissance": _dateNaissanceController.text.trim(),
+      "genre":          _selectedGenre == "Masculin" ? "Homme" : "Femme",
+      "phone":          _telephoneController.text.trim(),
+      "email":          _emailController.text.trim(),
+      "cours_id":       selectedCourseId,
     };
 
-    // Log des données envoyées
-    print("Données envoyées: ${jsonEncode(data)}");
+    // 5) Logs pour débogage : URL + données envoyées
+    print("→ POST $url");
+    print("Données envoyées : ${jsonEncode(data)}");
 
     try {
-      // Envoi de la requête POST
-      var response = await http.post(
+      final response = await http.post(
         url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode(data), // Encode les données en JSON
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(data),
       );
 
-      // Log de la réponse
-      print("Statut HTTP: ${response.statusCode}");
-      print("Réponse du serveur: ${response.body}");
+      // 6) Logs retour : statut HTTP + body brut
+      print("← Statut HTTP : ${response.statusCode}");
+      print("← Body brut : ${response.body}");
 
-      var responseData = jsonDecode(response.body);
-
-      // Gestion de la réponse
       if (response.statusCode == 200 || response.statusCode == 201) {
+        dynamic responseData;
+        try {
+          responseData = json.decode(response.body);
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Réponse non-JSON : $e")),
+          );
+          return;
+        }
+
         if (responseData["success"] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Réservation envoyée à votre adresse mail !")),
+            const SnackBar(content: Text("Inscription réussie !")),
           );
-          // Redirection vers la page des cours après 1 seconde
           await Future.delayed(const Duration(seconds: 1));
           Navigator.pushReplacementNamed(context, '/cours');
         } else {
+          final msgServeur = responseData["message"] ?? "Erreur inconnue.";
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Erreur: ${responseData["message"]}")),
+            SnackBar(content: Text("Erreur : $msgServeur")),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur: ${response.body}")),
+          SnackBar(content: Text("Erreur HTTP : ${response.statusCode}")),
         );
       }
     } catch (e) {
-      // Gestion des erreurs de connexion
-      print("Erreur de connexion: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Échec de connexion: $e")),
+        SnackBar(content: Text("Problème réseau : $e")),
       );
     }
   }
@@ -113,10 +201,10 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sélection du genre
+              // --------------- Genre ---------------
               Row(
                 children: [
-                  const Text("Genre: ", style: TextStyle(color: marron)),
+                  const Text("Genre : ", style: TextStyle(color: marron)),
                   Radio<String>(
                     value: "Masculin",
                     groupValue: _selectedGenre,
@@ -135,29 +223,44 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
               ),
               const SizedBox(height: 10),
 
-              // Champ Nom
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: "Nom",
-                  border: OutlineInputBorder(),
-                  labelStyle: TextStyle(color: marron),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Champ Prénom
+              // --------------- Prénom ---------------
               TextField(
                 controller: _prenomController,
                 decoration: const InputDecoration(
                   labelText: "Prénom",
                   border: OutlineInputBorder(),
                   labelStyle: TextStyle(color: marron),
+                  hintText: "Votre prénom",
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Champ Date de naissance
+              // --------------- Nom ---------------
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: "Nom",
+                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
+                  hintText: "Votre nom",
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // --------------- Email ---------------
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
+                  hintText: "votre@email.com",
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // --------------- Date de naissance ---------------
               TextField(
                 controller: _dateNaissanceController,
                 readOnly: true,
@@ -169,120 +272,103 @@ class _InscriptionCoranState extends State<InscriptionCoran> {
                     onPressed: () async {
                       DateTime? selectedDate = await showDatePicker(
                         context: context,
-                        initialDate: DateTime.now(),
+                        initialDate: DateTime.now().subtract(const Duration(days: 365 * 20)),
                         firstDate: DateTime(1900),
-                        lastDate: DateTime(2100),
+                        lastDate: DateTime.now(),
                       );
                       if (selectedDate != null) {
                         setState(() {
                           _dateNaissanceController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
+                          "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
                         });
                       }
                     },
                   ),
-                  labelStyle: TextStyle(color: marron),
+                  labelStyle: const TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Champ Téléphone
+              // --------------- Téléphone ---------------
               TextField(
                 controller: _telephoneController,
+                keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: "N° de téléphone",
                   border: OutlineInputBorder(),
                   labelStyle: TextStyle(color: marron),
+                  hintText: "+33...",
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Champ Date du cours
-              TextField(
-                controller: _dateCoursController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: "Date du cours",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () async {
-                      DateTime? selectedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2100),
-                      );
-                      if (selectedDate != null) {
-                        setState(() {
-                          _dateCoursController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
-                        });
-                      }
-                    },
-                  ),
-                  labelStyle: TextStyle(color: marron),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // Sélection des horaires
+              // --------------- Titre “Choisir date et heure” ---------------
               const Text(
-                "Sélectionnez les horaires :",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
+                "Choisir date et heure :",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: marron,
+                ),
               ),
-              Wrap(
-                children: [
-                  buildCheckbox("9h-10h"),
-                  buildCheckbox("10h-11h"),
-                  buildCheckbox("11h-12h"),
-                  buildCheckbox("14h-15h"),
-                  buildCheckbox("15h-16h"),
-                  buildCheckbox("16h-17h"),
-                  buildCheckbox("19h-20h"),
-                  buildCheckbox("20h-21h"),
-                  buildCheckbox("21h-22h"),
-                ],
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
-              // Bouton de soumission
+              // --------------- Affichage des créneaux avec date et heure ---------------
+              if (_isLoadingSlots) ...[
+                const Center(child: CircularProgressIndicator()),
+              ] else if (_timeSlots.isEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    "Aucun créneau disponible",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ] else ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _timeSlots.map((slot) {
+                    final slotId = slot['id'] as int;
+                    final date   = slot['date'] as String;   // ex : "vendredi 27 juin 2025"
+                    final heure  = slot['heure'] as String;  // ex : "09h"
+                    final isChecked = _selectedSlotIds.contains(slotId);
+
+                    return FilterChip(
+                      label: Text("$date – $heure"),
+                      selected: isChecked,
+                      selectedColor: marron.withOpacity(0.2),
+                      checkmarkColor: marron,
+                      onSelected: (selected) {
+                        setState(() {
+                          if (selected) {
+                            _selectedSlotIds.add(slotId);
+                          } else {
+                            _selectedSlotIds.remove(slotId);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ],
+              const SizedBox(height: 30),
+
+              // --------------- Bouton “S'inscrire” ---------------
               Center(
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: beigeClair, foregroundColor: marron),
-                  onPressed: _submitForm, // Appel de la méthode _submitForm
-                  child: const Text("Réserver"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: beigeClair,
+                    foregroundColor: marron,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                  ),
+                  onPressed: _submitForm,
+                  child: const Text("S'inscrire"),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // Widget pour les cases à cocher
-  Widget buildCheckbox(String time) {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Checkbox(
-            value: selectedHours.contains(time),
-            activeColor: marron,
-            onChanged: (bool? selected) {
-              setState(() {
-                if (selected == true) {
-                  selectedHours.add(time);
-                } else {
-                  selectedHours.remove(time);
-                }
-              });
-            },
-          ),
-          Text(time, style: TextStyle(color: marron)),
-        ],
       ),
     );
   }

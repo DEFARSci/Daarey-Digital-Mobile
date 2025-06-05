@@ -228,16 +228,16 @@ class _CoursState extends State<Cours> with WidgetsBindingObserver {
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: beigeClair,
-                      foregroundColor: marron,
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    onPressed: () => _navigateToPrivateSection(context, '/salleCours'),
-                    child: const Text("Accéder aux salles de cours", style: TextStyle(fontSize: 16)),
-                  ),
-                  const SizedBox(height: 16),
+                  // ElevatedButton(
+                  //   style: ElevatedButton.styleFrom(
+                  //     backgroundColor: beigeClair,
+                  //     foregroundColor: marron,
+                  //     minimumSize: const Size(double.infinity, 50),
+                  //   ),
+                  //   onPressed: () => _navigateToPrivateSection(context, '/salleCours'),
+                  //   child: const Text("Accéder aux salles de cours", style: TextStyle(fontSize: 16)),
+                  // ),
+                  // const SizedBox(height: 16),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: beigeClair,

@@ -16,81 +16,167 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _prenomController = TextEditingController();
+
+  // Contrôleur pour l’Email
+  final TextEditingController _emailController = TextEditingController();
+
   final TextEditingController _dateNaissanceController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
-  final TextEditingController _dateCoursController = TextEditingController();
+
   String? _selectedGenre = "Masculin";
-  List<String> selectedHours = [];
+
+  // Liste des créneaux récupérés, chacun avec { "id", "heure", "date" }
+  List<Map<String, dynamic>> _timeSlots = [];
+  bool _isLoadingSlots = false;
+
+  // ID du créneau choisi dans le dropdown
+  int? _selectedSlotId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTimeSlots();
+  }
+
+  /// Récupère les créneaux horaires depuis l’API “confirme/coran” :
+  /// GET https://www.hadith.defarsci.fr/api/cours/confirme/coran
+  /// Pour chaque entrée, la clé est la date (ex: "vendredi 27 juin 2025") et
+  /// la valeur contient un champ "cours" (liste). On extrait {id, heure, date}.
+  Future<void> _fetchTimeSlots() async {
+    setState(() {
+      _isLoadingSlots = true;
+    });
+
+    try {
+      final uri = Uri.parse("https://www.hadith.defarsci.fr/api/cours/confirme/coran");
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decoded = json.decode(response.body);
+
+        // Liste temporaire pour stocker { "id", "heure", "date" }
+        final List<Map<String, dynamic>> slotsAvecDate = [];
+
+        if (decoded is Map<String, dynamic>) {
+          decoded.forEach((keyDate, value) {
+            if (value is Map<String, dynamic> && value.containsKey("cours")) {
+              // Prendre date_complete si présent, sinon la clé JSON
+              final String dateComplete = (value["date_complete"] as String?) ?? keyDate;
+              final coursList = value["cours"];
+              if (coursList is List) {
+                for (var coursItem in coursList) {
+                  slotsAvecDate.add({
+                    "id": coursItem["id"] as int,
+                    "heure": coursItem["heure"] as String,
+                    "date": dateComplete,
+                  });
+                }
+              }
+            }
+          });
+        }
+
+        setState(() {
+          _timeSlots = slotsAvecDate;
+          _isLoadingSlots = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingSlots = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+            Text("Erreur ${response.statusCode} lors de la récupération des créneaux"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoadingSlots = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Échec de récupération des créneaux : $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   Future<void> _submitForm() async {
-    // Vérification que tous les champs sont remplis
+    // Validation : Tous les champs + sélection d’un créneau
     if (_nameController.text.isEmpty ||
         _prenomController.text.isEmpty ||
+        _emailController.text.isEmpty ||
         _dateNaissanceController.text.isEmpty ||
         _telephoneController.text.isEmpty ||
-        _dateCoursController.text.isEmpty ||
-        selectedHours.isEmpty) {
+        _selectedSlotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Veuillez remplir tous les champs")),
+        const SnackBar(content: Text("Veuillez remplir tous les champs et choisir un créneau")),
       );
       return;
     }
 
-    // URL de l'API (encodée pour éviter les problèmes de caractères spéciaux)
-    var url = Uri.parse("https://www.hadith.defarsci.fr/api/coran-inscriptions/confirmé");
+    // Construire l’URL EXACTE (casse incluse) pour l’Inscription Coran Confirmé
+    final url = Uri.parse("https://www.hadith.defarsci.fr/api/coranInscriptions");
 
-    // Données à envoyer
-    Map<String, dynamic> data = {
-      "first_name": _prenomController.text,
-      "last_name": _nameController.text,
-      "date_naissance": _dateNaissanceController.text,
-      "genre": _selectedGenre,
-      "phone": _telephoneController.text,
-      "date_cours": _dateCoursController.text,
-      "heure_cours": selectedHours.isNotEmpty ? selectedHours.first : "", // Envoyer une seule heure
+    final Map<String, dynamic> data = {
+      "first_name":     _prenomController.text.trim(),
+      "last_name":      _nameController.text.trim(),
+      "date_naissance": _dateNaissanceController.text.trim(),
+      "genre":          _selectedGenre, // "Masculin" ou "Féminin"
+      "phone":          _telephoneController.text.trim(),
+      "email":          _emailController.text.trim(),
+      "cours_id":       _selectedSlotId, // ID du créneau sélectionné
     };
 
-    // Log des données envoyées
+    // Debug : URL et payload
     print("URL: $url");
     print("Données envoyées: ${jsonEncode(data)}");
 
     try {
-      // Envoi de la requête POST
-      var response = await http.post(
+      final response = await http.post(
         url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode(data), // Encode les données en JSON
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode(data),
       );
 
-      // Log de la réponse
       print("Statut HTTP: ${response.statusCode}");
       print("Réponse du serveur: ${response.body}");
 
-      var responseData = jsonDecode(response.body);
-
-      // Gestion de la réponse
       if (response.statusCode == 200 || response.statusCode == 201) {
+        dynamic responseData;
+        try {
+          responseData = json.decode(response.body);
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Réponse non-JSON : $e")),
+          );
+          return;
+        }
+
         if (responseData["success"] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Inscription réussie !")),
           );
+          // Redirection éventuelle, par ex :
+          // Navigator.pushReplacementNamed(context, '/coursConfirmes');
         } else {
+          final msgServeur = responseData["message"] ?? "Erreur inconnue.";
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Erreur: ${responseData["message"]}")),
+            SnackBar(content: Text("Erreur : $msgServeur")),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur: ${response.body}")),
+          SnackBar(content: Text("Erreur HTTP : ${response.statusCode}")),
         );
       }
     } catch (e) {
-      // Gestion des erreurs de connexion
-      print("Erreur de connexion: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Échec de connexion: $e")),
+        SnackBar(content: Text("Échec de connexion : $e")),
       );
     }
   }
@@ -111,10 +197,10 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Sélection du genre
+              // --------------- Genre ---------------
               Row(
                 children: [
-                  const Text("Genre: ", style: TextStyle(color: marron)),
+                  const Text("Genre : ", style: TextStyle(color: marron)),
                   Radio<String>(
                     value: "Masculin",
                     groupValue: _selectedGenre,
@@ -133,18 +219,7 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
               ),
               const SizedBox(height: 10),
 
-              // Champ Nom
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: "Nom",
-                  border: OutlineInputBorder(),
-                  labelStyle: TextStyle(color: marron),
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Champ Prénom
+              // --------------- Prénom ---------------
               TextField(
                 controller: _prenomController,
                 decoration: const InputDecoration(
@@ -155,7 +230,30 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
               ),
               const SizedBox(height: 10),
 
-              // Champ Date de naissance
+              // --------------- Nom ---------------
+              TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: "Nom",
+                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // --------------- Email ---------------
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                  border: OutlineInputBorder(),
+                  labelStyle: TextStyle(color: marron),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // --------------- Date de naissance ---------------
               TextField(
                 controller: _dateNaissanceController,
                 readOnly: true,
@@ -174,19 +272,20 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
                       if (selectedDate != null) {
                         setState(() {
                           _dateNaissanceController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
+                          "${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}";
                         });
                       }
                     },
                   ),
-                  labelStyle: TextStyle(color: marron),
+                  labelStyle: const TextStyle(color: marron),
                 ),
               ),
               const SizedBox(height: 10),
 
-              // Champ Téléphone
+              // --------------- Téléphone ---------------
               TextField(
                 controller: _telephoneController,
+                keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: "N° de téléphone",
                   border: OutlineInputBorder(),
@@ -195,91 +294,67 @@ class _InscriptioncoranconfirmeState extends State<Inscriptioncoranconfirme> {
               ),
               const SizedBox(height: 20),
 
-              // Champ Date du cours
-              TextField(
-                controller: _dateCoursController,
-                readOnly: true,
-                decoration: InputDecoration(
-                  labelText: "Date du cours",
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.calendar_today),
-                    onPressed: () async {
-                      DateTime? selectedDate = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime(2100),
-                      );
-                      if (selectedDate != null) {
-                        setState(() {
-                          _dateCoursController.text =
-                          "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
-                        });
-                      }
-                    },
-                  ),
-                  labelStyle: TextStyle(color: marron),
+              // --------------- Sélection du créneau ---------------
+              const Text(
+                "Sélectionnez un créneau :",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: marron,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
 
-              // Sélection des horaires
-              const Text(
-                "Sélectionnez les horaires :",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: marron),
-              ),
-              Wrap(
-                children: [
-                  buildCheckbox("9h-10h"),
-                  buildCheckbox("10h-11h"),
-                  buildCheckbox("11h-12h"),
-                  buildCheckbox("14h-15h"),
-                  buildCheckbox("15h-16h"),
-                  buildCheckbox("16h-17h"),
-                  buildCheckbox("19h-20h"),
-                  buildCheckbox("20h-21h"),
-                  buildCheckbox("21h-22h"),
-                ],
-              ),
-              const SizedBox(height: 20),
+              // Loader pendant la récupération
+              if (_isLoadingSlots)
+                const Center(child: CircularProgressIndicator())
+              // Si pas de créneau après chargement
+              else if (!_isLoadingSlots && _timeSlots.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    "Aucun créneau disponible",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                )
+              // Sinon, on affiche un Dropdown avec “date – heure”
+              else
+                DropdownButtonFormField<int>(
+                  value: _selectedSlotId,
+                  decoration: InputDecoration(
+                    labelText: "Choisir le créneau",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: _timeSlots.map((slot) {
+                    return DropdownMenuItem<int>(
+                      value: slot["id"] as int,
+                      child: Text("${slot["date"]} – ${slot["heure"]}"),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedSlotId = val;
+                    });
+                  },
+                ),
 
-              // Bouton de soumission
+              const SizedBox(height: 24),
+
+              // --------------- Bouton “Réserver” ---------------
               Center(
                 child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: beigeClair, foregroundColor: marron),
-                  onPressed: _submitForm, // Appel de la méthode _submitForm
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: beigeClair,
+                    foregroundColor: marron,
+                  ),
+                  onPressed: _submitForm,
                   child: const Text("Réserver"),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  // Widget pour les cases à cocher
-  Widget buildCheckbox(String time) {
-    return Padding(
-      padding: const EdgeInsets.all(4.0),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Checkbox(
-            value: selectedHours.contains(time),
-            onChanged: (bool? selected) {
-              setState(() {
-                if (selected == true) {
-                  selectedHours.add(time);
-                } else {
-                  selectedHours.remove(time);
-                }
-              });
-            },
-          ),
-          Text(time, style: TextStyle(color: marron)),
-        ],
       ),
     );
   }
