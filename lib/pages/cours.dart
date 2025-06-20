@@ -118,6 +118,28 @@ class _CoursState extends State<Cours> with WidgetsBindingObserver {
       }
     }
   }
+  Future<void> _navigateToSection(BuildContext context, String route) async {
+    // Liste des routes publiques qui ne nécessitent pas de connexion
+    final publicRoutes = ['/mosquee', '/', '/cours', '/contributions', '/faq', '/don'];
+
+    if (publicRoutes.contains(route)) {
+      // Accès direct pour les routes publiques
+      Navigator.pushNamed(context, route);
+    } else if (_isLoggedIn) {
+      // Accès autorisé pour les utilisateurs connectés
+      Navigator.pushNamed(context, route);
+    } else {
+      // Redirection vers le login pour les routes privées
+      final result = await Navigator.pushNamed(context, '/login');
+      if (result == true && mounted) {
+        await _checkLoginStatus();
+        // Re-tente la navigation après connexion
+        if (_isLoggedIn) {
+          Navigator.pushNamed(context, route);
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -244,7 +266,7 @@ class _CoursState extends State<Cours> with WidgetsBindingObserver {
                       foregroundColor: marron,
                       minimumSize: const Size(double.infinity, 50),
                     ),
-                    onPressed: () => _navigateToPrivateSection(context, '/mosquee'),
+                    onPressed: () => Navigator.pushNamed(context, '/mosquee'),
                     child: const Text("Accéder à la mosquée AS SALAM", style: TextStyle(fontSize: 16)),
                   ),
                 ],

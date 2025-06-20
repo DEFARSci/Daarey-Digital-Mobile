@@ -22,39 +22,144 @@ class _ContributionsState extends State<Contributions>
   bool isPlaying = false;
   String? currentAudioPath;
 
-  List hadiths = [];
-  List dogmes = [];
-  List comportements = []; // anciennement bienseance
-  List oussouls = [];     // anciennement oussoul
+  List<Map<String, dynamic>> hadiths = [];
+  List<Map<String, dynamic>> dogmes = [];
+  List<Map<String, dynamic>> comportements = [];
+  List<Map<String, dynamic>> oussouls = [];
 
   bool _isLoggedIn = false;
   int _currentTabIndex = 0;
 
   final String staticAudioUrl = 'https://www.hadith.defarsci.fr/audios/1737634407.mp3';
 
+  // search
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(length: 5, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) {
-        setState(() {
-          _currentTabIndex = _tabController.index;
-        });
-      }
-      _fetchAllData();
-    });
+
+    _tabController = TabController(length: 5, vsync: this)
+      ..addListener(() {
+        if (mounted) {
+          setState(() => _currentTabIndex = _tabController.index);
+        }
+        _fetchAllData();
+      });
+
     _checkLoginStatus();
     _fetchAllData();
 
-    _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
-      if (mounted) {
+    _audioPlayer.onPlayerStateChanged.listen((s) {
+      if (mounted) setState(() => isPlaying = (s == PlayerState.playing));
+    });
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => _isLoggedIn = prefs.getString('auth_token') != null);
+  }
+
+  Future<void> _fetchAllData() => Future.wait([
+    _fetchHadiths(),
+    _fetchDogmes(),
+    _fetchComportements(),
+    _fetchOussouls(),
+  ]);
+
+  Future<void> _fetchHadiths() async {
+    try {
+      final r = await http
+          .get(Uri.parse('https://www.hadith.defarsci.fr/api/hadiths'))
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(r.body);
         setState(() {
-          isPlaying = (state == PlayerState.playing);
+          hadiths = jsonList
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
         });
       }
-    });
+    } catch (_) {}
+  }
+
+  Future<void> _fetchDogmes() async {
+    try {
+      final r = await http
+          .get(Uri.parse('https://www.hadith.defarsci.fr/api/dogmes'))
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        final List<dynamic> jsonList = json.decode(r.body);
+        setState(() {
+          dogmes = jsonList
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchComportements() async {
+    try {
+      final r = await http
+          .get(Uri.parse('https://www.hadith.defarsci.fr/api/comportements'))
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        final dataList = (json.decode(r.body)['data'] as List<dynamic>);
+        setState(() {
+          comportements = dataList
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchOussouls() async {
+    try {
+      final r = await http
+          .get(Uri.parse('https://www.hadith.defarsci.fr/api/oussouls'))
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        final dataList = (json.decode(r.body)['data'] as List<dynamic>);
+        setState(() {
+          oussouls = dataList
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _logout() async {
+    await _audioPlayer.stop();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
+  }
+
+  Future<void> _toggleAudio(String url) async {
+    if (!isPlaying || currentAudioPath != url) {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(UrlSource(url));
+      setState(() {
+        isPlaying = true;
+        currentAudioPath = url;
+      });
+    } else {
+      await _audioPlayer.pause();
+      setState(() => isPlaying = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _audioPlayer.dispose();
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -68,10 +173,7 @@ class _ContributionsState extends State<Contributions>
         foregroundColor: marron,
         actions: [
           if (_isLoggedIn)
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: _logout,
-            ),
+            IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -82,8 +184,8 @@ class _ContributionsState extends State<Contributions>
           tabs: const [
             Tab(text: "Aqida"),
             Tab(text: "Hadiths"),
-            Tab(text: "Bienséance"), // on conserve le libellé “Bienséance” pour l’onglet
-            Tab(text: "Oussoul"),
+            Tab(text: "Bienséance"),
+            Tab(text: "Oussouls"),
             Tab(text: "Biographie"),
           ],
         ),
@@ -96,24 +198,44 @@ class _ContributionsState extends State<Contributions>
               margin: const EdgeInsets.all(16),
               child: ListTile(
                 leading: IconButton(
-                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow, color: marron),
+                  icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: marron),
                   onPressed: () => _toggleAudio(staticAudioUrl),
                 ),
-                title: Text("Écouter l'audio principal", style: TextStyle(color: marron)),
+                title: Text("Écouter l'audio principal",
+                    style: TextStyle(color: marron)),
                 subtitle: Text(
                   isPlaying ? "Lecture en cours..." : "Appuyez pour écouter",
                   style: TextStyle(color: marron.withOpacity(0.8)),
                 ),
               ),
             ),
+
+          if (_currentTabIndex != 4)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: "Rechercher…",
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onChanged: (q) =>
+                    setState(() => _searchQuery = q.trim().toLowerCase()),
+              ),
+            ),
+
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildList(dogmes, "Dogme"),
+                _buildList(_filterList(dogmes), "Dogme"),
                 _buildHadithList(),
-                _buildList(comportements, "Bienséance"),
-                _buildList(oussouls, "Oussoul"),
+                _buildList(_filterList(comportements), "Bienséance"),
+                _buildList(_filterList(oussouls), "Oussoul"),
                 _buildDetailedBiography(),
               ],
             ),
@@ -121,13 +243,12 @@ class _ContributionsState extends State<Contributions>
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
         backgroundColor: beigeClair,
         selectedItemColor: marron,
         unselectedItemColor: marron.withOpacity(0.6),
         currentIndex: 2,
-        onTap: (index) async {
-          switch (index) {
+        onTap: (i) {
+          switch (i) {
             case 0:
               Navigator.pushNamed(context, '/');
               break;
@@ -140,267 +261,120 @@ class _ContributionsState extends State<Contributions>
               Navigator.pushNamed(context, '/faq');
               break;
             case 4:
-              await _navigateToPrivateSection(context);
-              break;
-            case 5:
-              Navigator.pushNamed(context, '/don');
+              Navigator.pushNamed(context, '/salon');
               break;
           }
         },
         items: [
           const BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
           const BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
-          const BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contributions"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.volunteer_activism), label: "Contributions"),
           const BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
           BottomNavigationBarItem(
             icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock),
             label: "Salon privé",
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
         ],
       ),
     );
   }
 
-  /// Récupère tous les items en parallèle
-  Future<void> _fetchAllData() async {
-    await Future.wait([
-      _fetchHadiths(),
-      _fetchDogmes(),
-      _fetchComportements(),
-      _fetchOussouls(),
-    ]);
+  List<Map<String, dynamic>> _filterList(List<Map<String, dynamic>> items) {
+    if (_searchQuery.isEmpty) return items;
+    return items.where((item) {
+      final text = [
+        item['title']?.toString() ?? "",
+        item['content']?.toString() ?? "",
+        item['description']?.toString() ?? "",
+        item['definition']?.toString() ?? "",
+        item['nom']?.toString() ?? ""
+      ].join(" ").toLowerCase();
+      return text.contains(_searchQuery);
+    }).toList();
   }
 
-  /// Vérifie si l’utilisateur est connecté (existence d’un token en SharedPreferences)
-  Future<void> _checkLoginStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isLoggedIn = prefs.getString('auth_token') != null;
-    });
-  }
-
-  Future<void> _logout() async {
-    await _audioPlayer.stop();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-    }
-  }
-
-  Future<void> _navigateToPrivateSection(BuildContext context) async {
-    if (_isLoggedIn) {
-      Navigator.pushNamed(context, '/salon');
-    } else {
-      final result = await Navigator.pushNamed(context, '/login');
-      if (result == true && mounted) {
-        await _checkLoginStatus();
-      }
-    }
-  }
-
-  Future<void> _toggleAudio(String audioPath) async {
-    try {
-      if (!isPlaying || currentAudioPath != audioPath) {
-        await _audioPlayer.stop();
-        await _audioPlayer.play(UrlSource(audioPath));
-        if (mounted) {
-          setState(() {
-            isPlaying = true;
-            currentAudioPath = audioPath;
-          });
-        }
-      } else {
-        await _audioPlayer.pause();
-        if (mounted) {
-          setState(() {
-            isPlaying = false;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Erreur audio: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Erreur de lecture audio")),
-        );
-      }
-    }
-  }
-
-  /// Récupère la liste des hadiths
-  Future<void> _fetchHadiths() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://www.hadith.defarsci.fr/api/hadiths'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 && mounted) {
-        // Comme l'API renvoie un tableau JSON brut, on récupère directement la liste :
-        setState(() {
-          hadiths = json.decode(response.body);
-        });
-      }
-    } catch (e) {
-      debugPrint("Erreur chargement hadiths: $e");
-    }
-  }
-
-  /// Récupère la liste des dogmes
-  Future<void> _fetchDogmes() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://www.hadith.defarsci.fr/api/dogmes'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 && mounted) {
-        setState(() {
-          dogmes = json.decode(response.body);
-        });
-      }
-    } catch (e) {
-      debugPrint("Erreur chargement dogmes: $e");
-    }
-  }
-
-
-  /// Récupère la liste des comportements (ancienne “Bienséance”)
-  Future<void> _fetchComportements() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://www.hadith.defarsci.fr/api/comportements'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 && mounted) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        setState(() {
-          comportements = List.from(jsonResponse['data'] ?? []);
-        });
-      }
-    } catch (e) {
-      debugPrint("Erreur chargement comportements: $e");
-    }
-  }
-
-  /// Récupère la liste des Oussouls
-  Future<void> _fetchOussouls() async {
-    try {
-      final response = await http
-          .get(Uri.parse('https://www.hadith.defarsci.fr/api/oussouls'))
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 && mounted) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        setState(() {
-          oussouls = List.from(jsonResponse['data'] ?? []);
-        });
-      }
-    } catch (e) {
-      debugPrint("Erreur chargement oussouls: $e");
-    }
-  }
-
-  /// Widget générique pour afficher une liste d’items (hadiths, dogmes, comportements, oussouls…)
-  Widget _buildList(List items, String type) {
-    if (items.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
+  Widget _buildList(List<Map<String, dynamic>> items, String type) {
+    if (items.isEmpty) return const Center(child: CircularProgressIndicator());
     return ListView.builder(
       itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-
-        String titre;
-        String description;
-        if (type == "Dogme" || type == "Aqida") {
-          // ─────── POUR /api/dogmes ───────────────────────
-          titre = item['title'] ?? "Sans titre";
-          description = item['content'] ?? "Pas de contenu";
+      itemBuilder: (c, i) {
+        final item = items[i];
+        late String titre, desc;
+        if (type == "Dogme") {
+          titre = item['title'] ?? "";
+          desc = item['content'] ?? "";
+        } else if (type == "Bienséance") {
+          titre = item['title'] ?? "";
+          desc = item['description'] ?? "";
+        } else if (type == "Oussoul") {
+          titre = item['nom'] ?? "";
+          desc = item['definition'] ?? "";
+        } else {
+          titre = item['title'] ?? item['nom'] ?? "";
+          desc = item['description'] ?? item['definition'] ?? "";
         }
-        else if (type == "Bienséance") {
-          titre = item['title'] ?? "—";
-          description = item['description'] ?? "—";
-        }
-        else if (type == "Oussoul") {
-          titre = item['nom'] ?? "—";
-          description = item['definition'] ?? "—";
-        }
-        else {
-          titre = item['title'] ?? item['nom'] ?? "—";
-          description = item['description'] ?? item['definition'] ?? "—";
-        }
-
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           color: beigeClair,
           child: ListTile(
-            title: Text(
-              titre,
-              style: TextStyle(color: marron, fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              description,
-              style: TextStyle(color: marron.withOpacity(0.7)),
-            ),
+            title: Text(titre,
+                style: TextStyle(color: marron, fontWeight: FontWeight.bold)),
+            subtitle: Text(desc, style: TextStyle(color: marron.withOpacity(0.7))),
           ),
         );
       },
     );
   }
 
-  /// Liste des hadiths (avec prise en charge de l'audio par hadith)
   Widget _buildHadithList() {
-    if (hadiths.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    return ListView.builder(
-      itemCount: hadiths.length,
-      itemBuilder: (context, index) {
-        final hadith = hadiths[index] as Map<String, dynamic>;
-        final String titre = hadith['title'] ?? 'Sans titre';
-        final String contenu = hadith['content'] ?? 'Pas de contenu';
-        final String? audioFichier = hadith['audio_url'];
+    final filtered = _searchQuery.isEmpty
+        ? hadiths
+        : hadiths.where((h) {
+      final all = "${h['title'] ?? ''} ${h['content'] ?? ''}".toLowerCase();
+      return all.contains(_searchQuery);
+    }).toList();
 
+    if (filtered.isEmpty) return const Center(child: CircularProgressIndicator());
+    return ListView.builder(
+      itemCount: filtered.length,
+      itemBuilder: (c, i) {
+        final h = filtered[i];
         return Card(
           color: beigeClair,
           margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  titre,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: marron,
-                  ),
-                ),
+                Text(h['title'] ?? '',
+                    style:
+                    TextStyle(fontWeight: FontWeight.bold, color: marron)),
                 const SizedBox(height: 6),
-                Text(
-                  contenu,
-                  style: TextStyle(color: marron),
-                ),
-                if (audioFichier != null) ...[
+                Text(h['content'] ?? '', style: TextStyle(color: marron)),
+                if (h['audio_url'] != null) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       IconButton(
                         icon: Icon(
-                          currentAudioPath == audioFichier && isPlaying
+                          currentAudioPath == h['audio_url'] && isPlaying
                               ? Icons.pause
                               : Icons.play_arrow,
                           color: marron,
                         ),
-                        onPressed: () => _toggleAudio(audioFichier),
+                        onPressed: () => _toggleAudio(h['audio_url']),
                       ),
                       Text(
-                        currentAudioPath == audioFichier && isPlaying
+                        currentAudioPath == h['audio_url'] && isPlaying
                             ? "Lecture en cours..."
                             : "Écouter l'audio",
                         style: TextStyle(color: marron),
                       ),
                     ],
                   ),
-                ],
+                ]
               ],
             ),
           ),

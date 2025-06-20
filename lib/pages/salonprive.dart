@@ -24,6 +24,11 @@ class _SalonpriveState extends State<Salonprive> {
   int currentUserId = 0;
   bool isLoading = false;
 
+  // ─── Recherche ─────────────────────────────────────────────────────
+  List<dynamic> _filteredForums = [];
+  List<dynamic> _filteredThreads = [];
+  final TextEditingController _searchController = TextEditingController();
+
   final TextEditingController _threadTitleController = TextEditingController();
   final TextEditingController _postContentController = TextEditingController();
 
@@ -31,7 +36,34 @@ class _SalonpriveState extends State<Salonprive> {
   void initState() {
     super.initState();
     _loadUserData();
+    _searchController.addListener(_onSearchChanged);
   }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (selectedForumId == null) {
+        _filteredForums = forums.where((f) {
+          final name = (f['name'] ?? '').toString().toLowerCase();
+          return name.contains(query);
+        }).toList();
+      } else if (selectedThreadId == null) {
+        _filteredThreads = threads.where((t) {
+          final title = (t['title'] ?? '').toString().toLowerCase();
+          return title.contains(query);
+        }).toList();
+      }
+      // si on affiche les posts, on ne filtre pas
+    });
+  }
+  // ────────────────────────────────────────────────────────────────────
 
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
@@ -47,17 +79,17 @@ class _SalonpriveState extends State<Salonprive> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.get(
         Uri.parse('https://www.hadith.defarsci.fr/api/forums'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
           forums = data['data'] ?? [];
+          _filteredForums = forums;
           threads = [];
+          _filteredThreads = [];
           posts = [];
           selectedForumId = null;
           selectedThreadId = null;
@@ -77,19 +109,18 @@ class _SalonpriveState extends State<Salonprive> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.get(
         Uri.parse('https://www.hadith.defarsci.fr/api/threads?forum_id=$forumId'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
           selectedForumId = forumId;
-          selectedThreadId = null;
           threads = data['data'] ?? [];
+          _filteredThreads = threads;
           posts = [];
+          selectedThreadId = null;
         });
       } else if (response.statusCode == 401) {
         _handleUnauthorized();
@@ -106,12 +137,10 @@ class _SalonpriveState extends State<Salonprive> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.get(
         Uri.parse('https://www.hadith.defarsci.fr/api/posts?thread_id=$threadId'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -130,12 +159,10 @@ class _SalonpriveState extends State<Salonprive> {
 
   Future<void> _createThread(String title) async {
     if (title.isEmpty || selectedForumId == null) return;
-
     setState(() => isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.post(
         Uri.parse('https://www.hadith.defarsci.fr/api/threads'),
         headers: {
@@ -148,7 +175,6 @@ class _SalonpriveState extends State<Salonprive> {
           'title': title,
         }),
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 201) {
         _threadTitleController.clear();
         await _fetchThreads(selectedForumId!);
@@ -166,12 +192,10 @@ class _SalonpriveState extends State<Salonprive> {
 
   Future<void> _createPost() async {
     if (_postContentController.text.isEmpty || selectedThreadId == null) return;
-
     setState(() => isLoading = true);
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token');
-
       final response = await http.post(
         Uri.parse('https://www.hadith.defarsci.fr/api/posts'),
         headers: {
@@ -184,7 +208,6 @@ class _SalonpriveState extends State<Salonprive> {
           'content': _postContentController.text,
         }),
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 201) {
         _postContentController.clear();
         await _fetchPosts(selectedThreadId!);
@@ -210,10 +233,7 @@ class _SalonpriveState extends State<Salonprive> {
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
@@ -245,9 +265,7 @@ class _SalonpriveState extends State<Salonprive> {
               child: Text("Annuler", style: TextStyle(color: marron)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: beigeClair,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: beigeClair),
               onPressed: () {
                 final title = _threadTitleController.text.trim();
                 if (title.isNotEmpty) {
@@ -273,9 +291,9 @@ class _SalonpriveState extends State<Salonprive> {
 
   Widget _buildForumsList() {
     return ListView.builder(
-      itemCount: forums.length,
+      itemCount: _filteredForums.length,
       itemBuilder: (context, index) {
-        final forum = forums[index];
+        final forum = _filteredForums[index];
         return Card(
           color: beigeClair,
           margin: const EdgeInsets.symmetric(vertical: 8),
@@ -294,20 +312,21 @@ class _SalonpriveState extends State<Salonprive> {
     return Column(
       children: [
         ElevatedButton(
-          onPressed: () => setState(() => selectedForumId = null),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: beigeClair,
-          ),
+          onPressed: () => setState(() {
+            selectedForumId = null;
+            _searchController.clear();
+          }),
+          style: ElevatedButton.styleFrom(backgroundColor: beigeClair),
           child: Text("Retour aux forums", style: TextStyle(color: marron)),
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: threads.isEmpty
-              ? Center(child: Text("Aucune discussion dans ce forum", style: TextStyle(color: beigeClair)))
+          child: _filteredThreads.isEmpty
+              ? Center(child: Text("Aucune discussion", style: TextStyle(color: marron)))
               : ListView.builder(
-            itemCount: threads.length,
+            itemCount: _filteredThreads.length,
             itemBuilder: (context, index) {
-              final thread = threads[index];
+              final thread = _filteredThreads[index];
               return Card(
                 color: beigeClair,
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -332,16 +351,17 @@ class _SalonpriveState extends State<Salonprive> {
     return Column(
       children: [
         ElevatedButton(
-          onPressed: () => setState(() => selectedThreadId = null),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: beigeClair,
-          ),
+          onPressed: () => setState(() {
+            selectedThreadId = null;
+            _searchController.clear();
+          }),
+          style: ElevatedButton.styleFrom(backgroundColor: beigeClair),
           child: Text("Retour aux discussions", style: TextStyle(color: marron)),
         ),
         const SizedBox(height: 16),
         Expanded(
           child: posts.isEmpty
-              ? Center(child: Text("Aucun message dans cette discussion", style: TextStyle(color: marron)))
+              ? Center(child: Text("Aucun message", style: TextStyle(color: marron)))
               : ListView.builder(
             itemCount: posts.length,
             itemBuilder: (context, index) {
@@ -374,10 +394,7 @@ class _SalonpriveState extends State<Salonprive> {
                         alignment: Alignment.bottomRight,
                         child: Text(
                           post['created_at'] ?? '',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: marron.withOpacity(0.6),
-                          ),
+                          style: TextStyle(fontSize: 12, color: marron.withOpacity(0.6)),
                         ),
                       ),
                     ],
@@ -399,12 +416,8 @@ class _SalonpriveState extends State<Salonprive> {
                   decoration: InputDecoration(
                     labelText: "Écrire un message...",
                     labelStyle: TextStyle(color: marron),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(color: marron),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: marron),
-                    ),
+                    border: OutlineInputBorder(borderSide: BorderSide(color: marron)),
+                    focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: marron)),
                     suffixIcon: IconButton(
                       icon: Icon(Icons.send, color: marron),
                       onPressed: _createPost,
@@ -429,21 +442,45 @@ class _SalonpriveState extends State<Salonprive> {
         foregroundColor: marron,
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
       body: isLoading
           ? Center(child: CircularProgressIndicator(color: marron))
           : Padding(
         padding: const EdgeInsets.all(16),
-        child: selectedForumId == null
-            ? _buildForumsList()
-            : selectedThreadId == null
-            ? _buildThreadsList()
-            : _buildPostsList(),
+        child: Column(
+          children: [
+            // ─── Champ de recherche ─────────────────────────
+            if (selectedThreadId == null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: selectedForumId == null
+                        ? 'Rechercher un forum…'
+                        : 'Rechercher une discussion…',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: beigeClair,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+            // ────────────────────────────────────────────────
+            Expanded(
+              child: selectedForumId == null
+                  ? _buildForumsList()
+                  : selectedThreadId == null
+                  ? _buildThreadsList()
+                  : _buildPostsList(),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: selectedForumId != null && selectedThreadId == null
           ? FloatingActionButton(
@@ -480,16 +517,10 @@ class _SalonpriveState extends State<Salonprive> {
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
           BottomNavigationBarItem(icon: Icon(Icons.book), label: "Cours"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.volunteer_activism),
-            label: "Contribution",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contribution"),
           BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
           BottomNavigationBarItem(icon: Icon(Icons.lock_open), label: "Salon"),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.favorite),
-            label: "Don",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Don"),
         ],
       ),
     );

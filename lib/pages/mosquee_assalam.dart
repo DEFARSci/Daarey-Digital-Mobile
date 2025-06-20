@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:hijri/hijri_calendar.dart';
 
 class MosqueeAssalam extends StatefulWidget {
   const MosqueeAssalam({super.key});
@@ -14,18 +13,10 @@ class MosqueeAssalam extends StatefulWidget {
 class _MosqueeAssalamState extends State<MosqueeAssalam> {
   static const Color beigeClair = Color(0xFFF3EEE1);
   static const Color beigeMoyen = Color(0xFFE1DED5);
-  static const Color marron = Color(0xFF5D4C3B);
+  static const Color marron     = Color(0xFF5D4C3B);
 
-  final LatLng mosqueLocation = const LatLng(48.8566, 2.3522); // Paris, France
-  int _currentIndex = 1; // Index pour la page Mosquée (ajustez selon votre besoin)
-
-  final Map<String, String> prayerTimes = {
-    "Fajr": "05:30",
-    "Dhuhr": "13:00",
-    "Asr": "16:30",
-    "Maghrib": "18:45",
-    "Isha": "20:00",
-  };
+  final LatLng mosqueLocation = const LatLng(48.8566, 2.3522); // Paris
+  int _currentIndex = 1;
 
   final List<String> upcomingEvents = [
     "Projet Madrassa au Sénégal - 15 Novembre 2025",
@@ -33,24 +24,8 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
     "Collecte de dons pour les nécessiteux - 25 Novembre 2025",
   ];
 
-  String getHijriDate() {
-    final hijriDate = HijriCalendar.now();
-    return "${hijriDate.hDay} ${hijriDate.longMonthName} ${hijriDate.hYear}";
-  }
-
   void _navigateToInscriptionForm(BuildContext context) {
     Navigator.pushNamed(context, '/formulaireinscription');
-  }
-
-  void _openRegistrationLink() async {
-    const url = "https://www.hadith.defarsci.fr/inscription";
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Impossible d'ouvrir le lien")),
-      );
-    }
   }
 
   @override
@@ -68,7 +43,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Description de la mosquée
+            // Description
             Text(
               "Description de la mosquée",
               style: TextStyle(
@@ -85,7 +60,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
             ),
             const SizedBox(height: 20),
 
-            // Lien d'inscription
+            // Bouton inscription
             Center(
               child: ElevatedButton(
                 onPressed: () => _navigateToInscriptionForm(context),
@@ -138,42 +113,7 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
             ),
             const SizedBox(height: 20),
 
-            // Horaires de prières
-            Text(
-              "Horaires de prières",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: marron,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ...prayerTimes.entries.map((entry) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Text(
-                "${entry.key}: ${entry.value}",
-                style: TextStyle(fontSize: 16, color: marron),
-              ),
-            )),
-            const SizedBox(height: 20),
-
-            // Date Hijri
-            Text(
-              "Date du calendrier musulman",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: marron,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Aujourd'hui: ${getHijriDate()}",
-              style: TextStyle(fontSize: 16, color: marron),
-            ),
-            const SizedBox(height: 20),
-
-            // Événements
+            // Prochains événements
             Text(
               "Prochains événements",
               style: TextStyle(
@@ -200,44 +140,27 @@ class _MosqueeAssalamState extends State<MosqueeAssalam> {
         unselectedItemColor: marron.withOpacity(0.6),
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
           switch (index) {
             case 0:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/cours', (route) => false);
+              Navigator.pushNamed(context, '/cours'); // Changement ici
               break;
             case 1:
-            // Reste sur la page actuelle (Mosquée)
+            // reste sur Mosquée
               break;
             case 2:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/khutbah', (route) => false);
+              Navigator.pushNamed(context, '/khutbah'); // Changement ici
               break;
             case 3:
-              Navigator.pushNamedAndRemoveUntil(
-                  context, '/projet_madrassa', (route) => false);
+              Navigator.pushNamed(context, '/projet_madrassa'); // Changement ici
               break;
           }
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Accueil",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mosque),
-            label: "Mosquée",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.mic),
-            label: "Khoutba",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.school),
-            label: "Projet Madrassa",
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Accueil"),
+          BottomNavigationBarItem(icon: Icon(Icons.mosque), label: "Mosquée"),
+          BottomNavigationBarItem(icon: Icon(Icons.mic), label: "Khoutba"),
+          BottomNavigationBarItem(icon: Icon(Icons.school), label: "Projet Madrassa"),
         ],
       ),
     );

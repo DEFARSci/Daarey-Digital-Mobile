@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:daara_digitale/services/nominatim_service.dart';
 
 class FormulaireInscription extends StatefulWidget {
   const FormulaireInscription({super.key});
@@ -25,15 +27,13 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
   final _dateNaissanceController = TextEditingController();
   final _lieuNaissanceController = TextEditingController();
   final _adresseController = TextEditingController();
+
   final _tuteurPrenomController = TextEditingController();
   final _tuteurNomController = TextEditingController();
   final _tuteurProfessionController = TextEditingController();
   final _tuteurTelephoneController = TextEditingController();
   final _tuteurAdresseController = TextEditingController();
   final _tuteurEmailController = TextEditingController();
-  final _urgenceNomController = TextEditingController();
-  final _urgenceLienController = TextEditingController();
-  final _urgenceTelephoneController = TextEditingController();
 
   String _selectedGenre = 'Masculin';
   String _selectedPaiement = 'sur site';
@@ -70,9 +70,6 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
         "tuteur_telephone": _tuteurTelephoneController.text.trim(),
         "tuteur_adresse": _tuteurAdresseController.text.trim(),
         "tuteur_email": _tuteurEmailController.text.trim(),
-        "urgence_nom": _urgenceNomController.text.trim(),
-        "urgence_lien_parenté": _urgenceLienController.text.trim(),
-        "urgence_telephone": _urgenceTelephoneController.text.trim(),
         "mode_paiement": _selectedPaiement,
       });
 
@@ -107,9 +104,6 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
           _tuteurTelephoneController.clear();
           _tuteurAdresseController.clear();
           _tuteurEmailController.clear();
-          _urgenceNomController.clear();
-          _urgenceLienController.clear();
-          _urgenceTelephoneController.clear();
 
           setState(() {
             _selectedGenre = 'Masculin';
@@ -117,18 +111,11 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
           });
 
           if (paiementChoisi == "en ligne" && paymentUrl != null && paymentUrl.isNotEmpty) {
-            try {
-              await launchUrlString(paymentUrl, mode: LaunchMode.externalApplication);
-
-              // Après 10 secondes (le temps de faire le paiement), on redirige
-              Future.delayed(const Duration(seconds: 10), () {
-                Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-              });
-            } catch (e) {
-              _showDialog("Erreur", "Impossible d’ouvrir la page de paiement.");
-            }
+            await launchUrlString(paymentUrl, mode: LaunchMode.externalApplication);
+            Future.delayed(const Duration(seconds: 10), () {
+              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            });
           } else {
-            // Redirection immédiate après succès
             _showDialog("Inscription réussie", data["message"] ?? "Inscription terminée.");
             Future.delayed(const Duration(seconds: 2), () {
               Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
@@ -150,10 +137,7 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
         ],
       ),
     );
@@ -173,85 +157,128 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
         padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          child: Column(
-            children: [
-              _buildTextField(_prenomController, "Prénom *"),
-              _buildTextField(_nomController, "Nom *"),
-              DropdownButtonFormField<String>(
-                value: _selectedGenre,
-                items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                onChanged: (value) => setState(() => _selectedGenre = value!),
-                decoration: InputDecoration(
-                  labelText: "Genre *",
-                  labelStyle: TextStyle(color: marron),
-                  filled: true,
-                  fillColor: beigeClair,
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
-                  ),
-                ),
+          child: Column(children: [
+            _buildTextField(_prenomController, "Prénom *"),
+            _buildTextField(_nomController, "Nom *"),
+            DropdownButtonFormField<String>(
+              value: _selectedGenre,
+              items: genres.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+              onChanged: (v) => setState(() => _selectedGenre = v!),
+              decoration: InputDecoration(
+                labelText: "Genre *",
+                labelStyle: TextStyle(color: marron),
+                filled: true,
+                fillColor: beigeClair,
+                border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
               ),
-              _buildTextField(_telephoneController, "Téléphone *", keyboardType: TextInputType.phone),
-              TextFormField(
-                controller: _dateNaissanceController,
-                decoration: InputDecoration(
-                  labelText: "Date de naissance *",
-                  labelStyle: TextStyle(color: marron),
-                  filled: true,
-                  fillColor: beigeClair,
-                  suffixIcon: Icon(Icons.calendar_today, color: marron),
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
-                  ),
-                ),
-                readOnly: true,
-                onTap: () => _selectDate(context),
+            ),
+            _buildTextField(_telephoneController, "Téléphone *", keyboardType: TextInputType.phone),
+            TextFormField(
+              controller: _dateNaissanceController,
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: "Date de naissance *",
+                labelStyle: TextStyle(color: marron),
+                filled: true,
+                fillColor: beigeClair,
+                suffixIcon: Icon(Icons.calendar_today, color: marron),
+                border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
               ),
-              _buildTextField(_lieuNaissanceController, "Lieu de naissance *"),
-              _buildTextField(_adresseController, "Adresse *"),
-              const SizedBox(height: 20),
-              Text("Informations du tuteur",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: marron, fontSize: 18)),
-              _buildTextField(_tuteurPrenomController, "Prénom *"),
-              _buildTextField(_tuteurNomController, "Nom *"),
-              _buildTextField(_tuteurProfessionController, "Profession"),
-              _buildTextField(_tuteurTelephoneController, "Téléphone *", keyboardType: TextInputType.phone),
-              _buildTextField(_tuteurAdresseController, "Adresse"),
-              _buildTextField(_tuteurEmailController, "Email *", keyboardType: TextInputType.emailAddress),
-              const SizedBox(height: 20),
-              // Text("Contact d'urgence",
-              //     style: TextStyle(fontWeight: FontWeight.bold, color: marron, fontSize: 18)),
-              // _buildTextField(_urgenceNomController, "Nom complet *"),
-              // _buildTextField(_urgenceLienController, "Lien de parenté *"),
-              // _buildTextField(_urgenceTelephoneController, "Téléphone *", keyboardType: TextInputType.phone),
-              // const SizedBox(height: 20),
-              DropdownButtonFormField<String>(
-                value: _selectedPaiement,
-                items: modesPaiement.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (value) => setState(() => _selectedPaiement = value!),
-                decoration: InputDecoration(
-                  labelText: "Mode de paiement",
-                  labelStyle: TextStyle(color: marron),
-                  filled: true,
-                  fillColor: beigeClair,
-                  border: OutlineInputBorder(
-                    borderSide: BorderSide(color: marron.withOpacity(0.3)),
-                  ),
-                ),
+              onTap: () => _selectDate(context),
+              validator: (v) => v == null || v.isEmpty ? "Ce champ est requis" : null,
+            ),
+            _buildTextField(_lieuNaissanceController, "Lieu de naissance *"),
+
+            // Adresse avec autocomplétion
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: TypeAheadField<String>(
+                controller: _adresseController,
+                builder: (context, controller, focusNode) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: "Adresse *",
+                      labelStyle: TextStyle(color: marron),
+                      filled: true,
+                      fillColor: beigeClair,
+                      border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
+                      suffixIcon: const Icon(Icons.search, color: Colors.grey),
+                    ),
+                  );
+                },
+                suggestionsCallback: (pattern) async {
+                  if (pattern.length < 3) return [];
+                  return await NominatimService.fetchAddresses(pattern);
+                },
+                itemBuilder: (context, suggestion) => ListTile(title: Text(suggestion)),
+                onSelected: (suggestion) => _adresseController.text = suggestion,
               ),
-              const SizedBox(height: 30),
-              ElevatedButton(
-                onPressed: _submitForm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: marron,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                child: const Text("Soumettre l'inscription", style: TextStyle(fontSize: 18)),
+            ),
+
+            const SizedBox(height: 20),
+            Text("Informations du tuteur",
+                style: TextStyle(fontWeight: FontWeight.bold, color: marron, fontSize: 18)),
+            _buildTextField(_tuteurPrenomController, "Prénom *"),
+            _buildTextField(_tuteurNomController, "Nom *"),
+            // _buildTextField(_tuteurProfessionController, "Profession"),
+            _buildTextField(_tuteurTelephoneController, "Téléphone *", keyboardType: TextInputType.phone),
+
+            // Adresse du tuteur avec autocomplétion
+            // Padding(
+            //   padding: const EdgeInsets.symmetric(vertical: 8),
+            //   child: TypeAheadField<String>(
+            //     controller: _tuteurAdresseController,
+            //     builder: (context, controller, focusNode) {
+            //       return TextField(
+            //         controller: controller,
+            //         focusNode: focusNode,
+            //         decoration: InputDecoration(
+            //           labelText: "Adresse du tuteur *",
+            //           labelStyle: TextStyle(color: marron),
+            //           filled: true,
+            //           fillColor: beigeClair,
+            //           border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
+            //           suffixIcon: const Icon(Icons.search, color: Colors.grey),
+            //         ),
+            //       );
+            //     },
+            //     suggestionsCallback: (pattern) async {
+            //       if (pattern.length < 3) return [];
+            //       return await NominatimService.fetchAddresses(pattern);
+            //     },
+            //     itemBuilder: (context, suggestion) => ListTile(title: Text(suggestion)),
+            //     onSelected: (suggestion) => _tuteurAdresseController.text = suggestion,
+            //   ),
+            // ),
+
+            _buildTextField(_tuteurEmailController, "Email *", keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: 20),
+            DropdownButtonFormField<String>(
+              value: _selectedPaiement,
+              items: modesPaiement.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+              onChanged: (v) => setState(() => _selectedPaiement = v!),
+              decoration: InputDecoration(
+                labelText: "Mode de paiement",
+                labelStyle: TextStyle(color: marron),
+                filled: true,
+                fillColor: beigeClair,
+                border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 30),
+            ElevatedButton(
+              onPressed: _submitForm,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: marron,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text("Soumettre l'inscription", style: TextStyle(fontSize: 18)),
+            ),
+          ]),
         ),
       ),
     );
@@ -269,9 +296,7 @@ class _FormulaireInscriptionState extends State<FormulaireInscription> {
           labelStyle: TextStyle(color: marron),
           filled: true,
           fillColor: beigeClair,
-          border: OutlineInputBorder(
-            borderSide: BorderSide(color: marron.withOpacity(0.3)),
-          ),
+          border: OutlineInputBorder(borderSide: BorderSide(color: marron.withOpacity(0.3))),
         ),
         validator: (value) {
           if (label.contains('*') && (value == null || value.trim().isEmpty)) {

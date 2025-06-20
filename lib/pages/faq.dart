@@ -16,8 +16,10 @@ class _FaqState extends State<Faq> {
   static const Color marron = Color(0xFF5D4C3B);
 
   List<dynamic> faqData = [];
+  List<dynamic> filteredFaq = [];
   bool isLoading = true;
   bool _isLoggedIn = false;
+  String _searchQuery = "";
 
   @override
   void initState() {
@@ -40,12 +42,14 @@ class _FaqState extends State<Faq> {
           .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final decodedResponse = jsonDecode(response.body);
+        final rawList = decodedResponse['data'] ??
+            decodedResponse['faq'] ??
+            decodedResponse['questions'] ??
+            decodedResponse;
         if (mounted) {
           setState(() {
-            faqData = decodedResponse['data'] ??
-                decodedResponse['faq'] ??
-                decodedResponse['questions'] ??
-                decodedResponse;
+            faqData = rawList;
+            filteredFaq = faqData;
             isLoading = false;
           });
         }
@@ -56,7 +60,6 @@ class _FaqState extends State<Faq> {
     } catch (e) {
       if (mounted) setState(() => isLoading = false);
       _showErrorSnackbar("Erreur de connexion");
-      debugPrint("Erreur FAQ: $e");
     }
   }
 
@@ -85,19 +88,34 @@ class _FaqState extends State<Faq> {
     }
   }
 
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query.toLowerCase();
+      filteredFaq = faqData.where((item) {
+        final question = (item['question'] ?? item['titre'] ?? item['text'] ?? "")
+            .toString()
+            .toLowerCase();
+        final answer = (item['answer'] ?? item['reponse'] ?? item['content'] ?? "")
+            .toString()
+            .toLowerCase();
+        return question.contains(_searchQuery) || answer.contains(_searchQuery);
+      }).toList();
+    });
+  }
+
   Widget _buildFAQContent() {
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
-    if (faqData.isEmpty) {
-      return const Center(child: Text("Aucune question disponible pour le moment"));
+    if (filteredFaq.isEmpty) {
+      return const Center(child: Text("Aucune question ne correspond à votre recherche"));
     }
 
     return ListView.builder(
-      itemCount: faqData.length,
+      padding: const EdgeInsets.only(top: 8),
+      itemCount: filteredFaq.length,
       itemBuilder: (context, index) {
-        final item = faqData[index];
+        final item = filteredFaq[index];
         final question = item['question'] ?? item['titre'] ?? item['text'] ?? "Question sans titre";
         final answer = item['answer'] ?? item['reponse'] ?? item['content'] ?? "Réponse non disponible";
 
@@ -131,10 +149,6 @@ class _FaqState extends State<Faq> {
         backgroundColor: beigeClair,
         foregroundColor: marron,
         actions: [
-          // IconButton(
-          //   icon: const Icon(Icons.search),
-          //   onPressed: () {},
-          // ),
           if (_isLoggedIn)
             IconButton(
               icon: const Icon(Icons.logout),
@@ -142,7 +156,30 @@ class _FaqState extends State<Faq> {
             ),
         ],
       ),
-      body: _buildFAQContent(),
+      body: Column(
+        children: [
+          // --- Barre de recherche ---
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: "Rechercher dans la FAQ…",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: beigeClair,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+
+          // --- Contenu filtré ---
+          Expanded(child: _buildFAQContent()),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         backgroundColor: beigeClair,
@@ -176,7 +213,9 @@ class _FaqState extends State<Faq> {
           const BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: "Contribution"),
           const BottomNavigationBarItem(icon: Icon(Icons.help), label: "FAQ"),
           BottomNavigationBarItem(
-              icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock), label: "Salon privé"),
+            icon: Icon(_isLoggedIn ? Icons.lock_open : Icons.lock),
+            label: "Salon privé",
+          ),
           const BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "Faire un don"),
         ],
       ),
